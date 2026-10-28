@@ -62,6 +62,11 @@ function serialWriter(write: (data: Record<string, unknown>) => Promise<void>, o
   };
 }
 
+/** Documents read from Claude's storage arrive frozen; the game needs its own copy it can change. */
+function thaw<T>(v: T): T {
+  return v == null ? v : (JSON.parse(JSON.stringify(v)) as T);
+}
+
 function claudeStore(db: Db, uid: string, onError: (e: unknown) => void): Store {
   const gameRef = db.doc(`data/users/${uid}/game`);
   const prefsRef = db.doc(`data/users/${uid}/prefs`);
@@ -72,14 +77,14 @@ function claudeStore(db: Db, uid: string, onError: (e: unknown) => void): Store 
     async loadGame() {
       const snap = await gameRef.get();
       const data = snap.exists ? snap.data() : undefined;
-      return data && data.game ? (data.game as SavedGame) : null;
+      return data && data.game ? thaw(data.game as SavedGame) : null;
     },
     saveGame(game) {
       writeGame({ game: game as unknown as Record<string, unknown>, savedAt: Date.now() });
     },
     async loadPrefs() {
       const snap = await prefsRef.get();
-      return snap.exists ? (snap.data()?.prefs ?? null) : null;
+      return snap.exists ? thaw(snap.data()?.prefs ?? null) : null;
     },
     savePrefs(prefs) {
       writePrefs({ prefs: prefs as unknown as Record<string, unknown>, savedAt: Date.now() });

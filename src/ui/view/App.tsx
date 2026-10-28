@@ -154,7 +154,7 @@ export function App(props: AppProps) {
   const card = getCard(state.cardId);
 
   return (
-    <div class={`app${prefs.tileNames ? ' with-names' : ''}`}>
+    <div class={`app${prefs.tileNames ? ' with-names' : ''}`} data-phase={p.name} data-waiting-for-you={pending ? 'yes' : 'no'} data-step={`${state.gameNumber}:${state.actionCount}`}>
       <svg class="sprite" aria-hidden="true" dangerouslySetInnerHTML={{ __html: SPRITE }} />
       <TopBar state={state} onOpen={setSheet} />
       <Opponents state={state} />
@@ -248,10 +248,12 @@ function TopBar({ state, onOpen }: { state: GameState; onOpen: (s: SheetName) =>
   return (
     <header class="topbar">
       <div class="tb-who">
-        <span class="tb-game">Game {state.gameNumber}</span>
+        <span class="tb-game">
+          Game {state.gameNumber}
+          {dealer && <span class="tb-dealer"> · Dealer</span>}
+        </span>
         <span class="tb-seat">
-          You are <b>{windOf(state, HUMAN)}</b>
-          {dealer ? ', the dealer' : ''}
+          You're <b>{windOf(state, HUMAN)}</b>
         </span>
       </div>
       <div class="tb-stats">
@@ -376,7 +378,7 @@ function Messages({ state, session, blind }: { state: GameState; session: Sessio
   const newest = newestOnTable(state, session);
   const recent = session.log.slice(-6);
   const prompt = promptFor(state, HUMAN, blind, session.lastDrawn);
-  const notice = session.notice;
+  const notice = session.currentNotice;
   return (
     <section class="messages" aria-live="polite">
       {newest && (
@@ -386,7 +388,7 @@ function Messages({ state, session, blind }: { state: GameState; session: Sessio
       )}
       <div class="msg-lines">
         {recent.map((l, i) => (
-          <p class={`line tone-${l.tone}${i < recent.length - 2 ? ' is-older' : ''}`} key={l.n}>
+          <p class={`line tone-${l.tone}${i < recent.length - 2 ? ' is-older' : ''}${i === recent.length - 1 ? ' is-latest' : ''}`} key={l.n}>
             {l.text}
           </p>
         ))}
@@ -472,12 +474,7 @@ function Rack(props: {
 
 export function ChoiceButton({ c, primary, onAct }: { c: Choice; primary?: boolean; onAct: (c: Choice) => void }) {
   return (
-    <button
-      class={`btn${primary && c.ok ? ' primary' : ''}${c.ok ? '' : ' is-dim'}`}
-      aria-disabled={!c.ok}
-      title={c.ok ? undefined : (c.reason ?? undefined)}
-      onClick={() => onAct(c)}
-    >
+    <button class={`btn${primary && c.ok ? ' primary' : ''}${c.ok ? '' : ' is-dim'}`} title={c.ok ? undefined : (c.reason ?? undefined)} onClick={() => onAct(c)}>
       {c.tiles && c.tiles.length > 0 && (
         <span class="btn-tiles">
           {c.tiles.map((t) => (
@@ -488,6 +485,7 @@ export function ChoiceButton({ c, primary, onAct }: { c: Choice; primary?: boole
       <span class="btn-text">
         {c.label}
         {c.detail && <small>{c.detail}</small>}
+        {!c.ok && <span class="sr-only">, not available right now</span>}
       </span>
     </button>
   );
@@ -573,7 +571,6 @@ function Actions(props: {
           <ChoiceButton c={tc.mahjong} onAct={onAct} />
           <button
             class={`btn${ex.length ? '' : ' is-dim'}`}
-            aria-disabled={ex.length === 0}
             onClick={() =>
               ex.length
                 ? props.onOpen('exchange')

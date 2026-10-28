@@ -43,8 +43,9 @@ async function start(data: unknown): Promise<void> {
   } catch {
     store = { kind: 'none', loadGame: async () => null, saveGame: () => {}, loadPrefs: async () => null, savePrefs: () => {} };
   }
-  let saved: SavedGame | null = carried.game ?? null;
-  let prefsRaw: unknown = carried.prefs ?? null;
+  // the viewer may hand back a frozen copy of the game kept across a page update: work on a fresh one
+  let saved: SavedGame | null = carried.game ? (JSON.parse(JSON.stringify(carried.game)) as SavedGame) : null;
+  let prefsRaw: unknown = carried.prefs ? JSON.parse(JSON.stringify(carried.prefs)) : null;
   if (!saved) saved = await store.loadGame().catch(() => null);
   if (!prefsRaw) prefsRaw = await store.loadPrefs().catch(() => null);
   root.textContent = '';

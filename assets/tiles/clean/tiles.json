@@ -1,0 +1,664 @@
+{
+  "set": "American mah jongg, National Mah Jongg League rules, 152 tiles, no blanks",
+  "style": "Clean",
+  "total_tiles": 152,
+  "image_size_px": [
+    720,
+    1036
+  ],
+  "app_image_size_px": [
+    240,
+    345
+  ],
+  "tile_size_mm": {
+    "width": 22.0,
+    "height": 30.25,
+    "thickness": 12.7
+  },
+  "view": "face on, tipped 14 degrees so the thickness shows along the bottom edge; transparent background",
+  "codes_match": "the app's tile codes and kind numbers in src/engine/tiles.ts",
+  "tiles": [
+    {
+      "image": "images/bam-1.png",
+      "app_image": "images-app/bam-1.webp",
+      "svg": "faces-svg/bam-1.svg",
+      "name": "1 Bam",
+      "code": "1B",
+      "kind": 0,
+      "copies": 4,
+      "tile_ids": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "image": "images/bam-2.png",
+      "app_image": "images-app/bam-2.webp",
+      "svg": "faces-svg/bam-2.svg",
+      "name": "2 Bam",
+      "code": "2B",
+      "kind": 1,
+      "copies": 4,
+      "tile_ids": [
+        4,
+        5,
+        6,
+        7
+      ]
+    },
+    {
+      "image": "images/bam-3.png",
+      "app_image": "images-app/bam-3.webp",
+      "svg": "faces-svg/bam-3.svg",
+      "name": "3 Bam",
+      "code": "3B",
+      "kind": 2,
+      "copies": 4,
+      "tile_ids": [
+        8,
+        9,
+        10,
+        11
+      ]
+    },
+    {
+      "image": "images/bam-4.png",
+      "app_image": "images-app/bam-4.webp",
+      "svg": "faces-svg/bam-4.svg",
+      "name": "4 Bam",
+      "code": "4B",
+      "kind": 3,
+      "copies": 4,
+      "tile_ids": [
+        12,
+        13,
+        14,
+        15
+      ]
+    },
+    {
+      "image": "images/bam-5.png",
+      "app_image": "images-app/bam-5.webp",
+      "svg": "faces-svg/bam-5.svg",
+      "name": "5 Bam",
+      "code": "5B",
+      "kind": 4,
+      "copies": 4,
+      "tile_ids": [
+        16,
+        17,
+        18,
+        19
+      ]
+    },
+    {
+      "image": "images/bam-6.png",
+      "app_image": "images-app/bam-6.webp",
+      "svg": "faces-svg/bam-6.svg",
+      "name": "6 Bam",
+      "code": "6B",
+      "kind": 5,
+      "copies": 4,
+      "tile_ids": [
+        20,
+        21,
+        22,
+        23
+      ]
+    },
+    {
+      "image": "images/bam-7.png",
+      "app_image": "images-app/bam-7.webp",
+      "svg": "faces-svg/bam-7.svg",
+      "name": "7 Bam",
+      "code": "7B",
+      "kind": 6,
+      "copies": 4,
+      "tile_ids": [
+        24,
+        25,
+        26,
+        27
+      ]
+    },
+    {
+      "image": "images/bam-8.png",
+      "app_image": "images-app/bam-8.webp",
+      "svg": "faces-svg/bam-8.svg",
+      "name": "8 Bam",
+      "code": "8B",
+      "kind": 7,
+      "copies": 4,
+      "tile_ids": [
+        28,
+        29,
+        30,
+        31
+      ]
+    },
+    {
+      "image": "images/bam-9.png",
+      "app_image": "images-app/bam-9.webp",
+      "svg": "faces-svg/bam-9.svg",
+      "name": "9 Bam",
+      "code": "9B",
+      "kind": 8,
+      "copies": 4,
+      "tile_ids": [
+        32,
+        33,
+        34,
+        35
+      ]
+    },
+    {
+      "image": "images/crak-1.png",
+      "app_image": "images-app/crak-1.webp",
+      "svg": "faces-svg/crak-1.svg",
+      "name": "1 Crak",
+      "code": "1C",
+      "kind": 9,
+      "copies": 4,
+      "tile_ids": [
+        36,
+        37,
+        38,
+        39
+      ]
+    },
+    {
+      "image": "images/crak-2.png",
+      "app_image": "images-app/crak-2.webp",
+      "svg": "faces-svg/crak-2.svg",
+      "name": "2 Crak",
+      "code": "2C",
+      "kind": 10,
+      "copies": 4,
+      "tile_ids": [
+        40,
+        41,
+        42,
+        43
+      ]
+    },
+    {
+      "image": "images/crak-3.png",
+      "app_image": "images-app/crak-3.webp",
+      "svg": "faces-svg/crak-3.svg",
+      "name": "3 Crak",
+      "code": "3C",
+      "kind": 11,
+      "copies": 4,
+      "tile_ids": [
+        44,
+        45,
+        46,
+        47
+      ]
+    },
+    {
+      "image": "images/crak-4.png",
+      "app_image": "images-app/crak-4.webp",
+      "svg": "faces-svg/crak-4.svg",
+      "name": "4 Crak",
+      "code": "4C",
+      "kind": 12,
+      "copies": 4,
+      "tile_ids": [
+        48,
+        49,
+        50,
+        51
+      ]
+    },
+    {
+      "image": "images/crak-5.png",
+      "app_image": "images-app/crak-5.webp",
+      "svg": "faces-svg/crak-5.svg",
+      "name": "5 Crak",
+      "code": "5C",
+      "kind": 13,
+      "copies": 4,
+      "tile_ids": [
+        52,
+        53,
+        54,
+        55
+      ]
+    },
+    {
+      "image": "images/crak-6.png",
+      "app_image": "images-app/crak-6.webp",
+      "svg": "faces-svg/crak-6.svg",
+      "name": "6 Crak",
+      "code": "6C",
+      "kind": 14,
+      "copies": 4,
+      "tile_ids": [
+        56,
+        57,
+        58,
+        59
+      ]
+    },
+    {
+      "image": "images/crak-7.png",
+      "app_image": "images-app/crak-7.webp",
+      "svg": "faces-svg/crak-7.svg",
+      "name": "7 Crak",
+      "code": "7C",
+      "kind": 15,
+      "copies": 4,
+      "tile_ids": [
+        60,
+        61,
+        62,
+        63
+      ]
+    },
+    {
+      "image": "images/crak-8.png",
+      "app_image": "images-app/crak-8.webp",
+      "svg": "faces-svg/crak-8.svg",
+      "name": "8 Crak",
+      "code": "8C",
+      "kind": 16,
+      "copies": 4,
+      "tile_ids": [
+        64,
+        65,
+        66,
+        67
+      ]
+    },
+    {
+      "image": "images/crak-9.png",
+      "app_image": "images-app/crak-9.webp",
+      "svg": "faces-svg/crak-9.svg",
+      "name": "9 Crak",
+      "code": "9C",
+      "kind": 17,
+      "copies": 4,
+      "tile_ids": [
+        68,
+        69,
+        70,
+        71
+      ]
+    },
+    {
+      "image": "images/dot-1.png",
+      "app_image": "images-app/dot-1.webp",
+      "svg": "faces-svg/dot-1.svg",
+      "name": "1 Dot",
+      "code": "1D",
+      "kind": 18,
+      "copies": 4,
+      "tile_ids": [
+        72,
+        73,
+        74,
+        75
+      ]
+    },
+    {
+      "image": "images/dot-2.png",
+      "app_image": "images-app/dot-2.webp",
+      "svg": "faces-svg/dot-2.svg",
+      "name": "2 Dot",
+      "code": "2D",
+      "kind": 19,
+      "copies": 4,
+      "tile_ids": [
+        76,
+        77,
+        78,
+        79
+      ]
+    },
+    {
+      "image": "images/dot-3.png",
+      "app_image": "images-app/dot-3.webp",
+      "svg": "faces-svg/dot-3.svg",
+      "name": "3 Dot",
+      "code": "3D",
+      "kind": 20,
+      "copies": 4,
+      "tile_ids": [
+        80,
+        81,
+        82,
+        83
+      ]
+    },
+    {
+      "image": "images/dot-4.png",
+      "app_image": "images-app/dot-4.webp",
+      "svg": "faces-svg/dot-4.svg",
+      "name": "4 Dot",
+      "code": "4D",
+      "kind": 21,
+      "copies": 4,
+      "tile_ids": [
+        84,
+        85,
+        86,
+        87
+      ]
+    },
+    {
+      "image": "images/dot-5.png",
+      "app_image": "images-app/dot-5.webp",
+      "svg": "faces-svg/dot-5.svg",
+      "name": "5 Dot",
+      "code": "5D",
+      "kind": 22,
+      "copies": 4,
+      "tile_ids": [
+        88,
+        89,
+        90,
+        91
+      ]
+    },
+    {
+      "image": "images/dot-6.png",
+      "app_image": "images-app/dot-6.webp",
+      "svg": "faces-svg/dot-6.svg",
+      "name": "6 Dot",
+      "code": "6D",
+      "kind": 23,
+      "copies": 4,
+      "tile_ids": [
+        92,
+        93,
+        94,
+        95
+      ]
+    },
+    {
+      "image": "images/dot-7.png",
+      "app_image": "images-app/dot-7.webp",
+      "svg": "faces-svg/dot-7.svg",
+      "name": "7 Dot",
+      "code": "7D",
+      "kind": 24,
+      "copies": 4,
+      "tile_ids": [
+        96,
+        97,
+        98,
+        99
+      ]
+    },
+    {
+      "image": "images/dot-8.png",
+      "app_image": "images-app/dot-8.webp",
+      "svg": "faces-svg/dot-8.svg",
+      "name": "8 Dot",
+      "code": "8D",
+      "kind": 25,
+      "copies": 4,
+      "tile_ids": [
+        100,
+        101,
+        102,
+        103
+      ]
+    },
+    {
+      "image": "images/dot-9.png",
+      "app_image": "images-app/dot-9.webp",
+      "svg": "faces-svg/dot-9.svg",
+      "name": "9 Dot",
+      "code": "9D",
+      "kind": 26,
+      "copies": 4,
+      "tile_ids": [
+        104,
+        105,
+        106,
+        107
+      ]
+    },
+    {
+      "image": "images/wind-north.png",
+      "app_image": "images-app/wind-north.webp",
+      "svg": "faces-svg/wind-north.svg",
+      "name": "North",
+      "code": "N",
+      "kind": 27,
+      "copies": 4,
+      "tile_ids": [
+        108,
+        109,
+        110,
+        111
+      ]
+    },
+    {
+      "image": "images/wind-east.png",
+      "app_image": "images-app/wind-east.webp",
+      "svg": "faces-svg/wind-east.svg",
+      "name": "East",
+      "code": "E",
+      "kind": 28,
+      "copies": 4,
+      "tile_ids": [
+        112,
+        113,
+        114,
+        115
+      ]
+    },
+    {
+      "image": "images/wind-west.png",
+      "app_image": "images-app/wind-west.webp",
+      "svg": "faces-svg/wind-west.svg",
+      "name": "West",
+      "code": "W",
+      "kind": 29,
+      "copies": 4,
+      "tile_ids": [
+        116,
+        117,
+        118,
+        119
+      ]
+    },
+    {
+      "image": "images/wind-south.png",
+      "app_image": "images-app/wind-south.webp",
+      "svg": "faces-svg/wind-south.svg",
+      "name": "South",
+      "code": "S",
+      "kind": 30,
+      "copies": 4,
+      "tile_ids": [
+        120,
+        121,
+        122,
+        123
+      ]
+    },
+    {
+      "image": "images/dragon-red.png",
+      "app_image": "images-app/dragon-red.webp",
+      "svg": "faces-svg/dragon-red.svg",
+      "name": "Red Dragon",
+      "code": "RD",
+      "kind": 31,
+      "copies": 4,
+      "tile_ids": [
+        124,
+        125,
+        126,
+        127
+      ]
+    },
+    {
+      "image": "images/dragon-green.png",
+      "app_image": "images-app/dragon-green.webp",
+      "svg": "faces-svg/dragon-green.svg",
+      "name": "Green Dragon",
+      "code": "GD",
+      "kind": 32,
+      "copies": 4,
+      "tile_ids": [
+        128,
+        129,
+        130,
+        131
+      ]
+    },
+    {
+      "image": "images/dragon-soap.png",
+      "app_image": "images-app/dragon-soap.webp",
+      "svg": "faces-svg/dragon-soap.svg",
+      "name": "Soap",
+      "code": "WD",
+      "kind": 33,
+      "copies": 4,
+      "tile_ids": [
+        132,
+        133,
+        134,
+        135
+      ]
+    },
+    {
+      "image": "images/flower-1.png",
+      "app_image": "images-app/flower-1.webp",
+      "svg": "faces-svg/flower-1.svg",
+      "name": "Flower",
+      "code": "F",
+      "kind": 34,
+      "copies": 1,
+      "tile_ids": [
+        136
+      ],
+      "variant": 1
+    },
+    {
+      "image": "images/flower-2.png",
+      "app_image": "images-app/flower-2.webp",
+      "svg": "faces-svg/flower-2.svg",
+      "name": "Flower",
+      "code": "F",
+      "kind": 34,
+      "copies": 1,
+      "tile_ids": [
+        137
+      ],
+      "variant": 2
+    },
+    {
+      "image": "images/flower-3.png",
+      "app_image": "images-app/flower-3.webp",
+      "svg": "faces-svg/flower-3.svg",
+      "name": "Flower",
+      "code": "F",
+      "kind": 34,
+      "copies": 1,
+      "tile_ids": [
+        138
+      ],
+      "variant": 3
+    },
+    {
+      "image": "images/flower-4.png",
+      "app_image": "images-app/flower-4.webp",
+      "svg": "faces-svg/flower-4.svg",
+      "name": "Flower",
+      "code": "F",
+      "kind": 34,
+      "copies": 1,
+      "tile_ids": [
+        139
+      ],
+      "variant": 4
+    },
+    {
+      "image": "images/flower-5.png",
+      "app_image": "images-app/flower-5.webp",
+      "svg": "faces-svg/flower-5.svg",
+      "name": "Flower",
+      "code": "F",
+      "kind": 34,
+      "copies": 1,
+      "tile_ids": [
+        140
+      ],
+      "variant": 5
+    },
+    {
+      "image": "images/flower-6.png",
+      "app_image": "images-app/flower-6.webp",
+      "svg": "faces-svg/flower-6.svg",
+      "name": "Flower",
+      "code": "F",
+      "kind": 34,
+      "copies": 1,
+      "tile_ids": [
+        141
+      ],
+      "variant": 6
+    },
+    {
+      "image": "images/flower-7.png",
+      "app_image": "images-app/flower-7.webp",
+      "svg": "faces-svg/flower-7.svg",
+      "name": "Flower",
+      "code": "F",
+      "kind": 34,
+      "copies": 1,
+      "tile_ids": [
+        142
+      ],
+      "variant": 7
+    },
+    {
+      "image": "images/flower-8.png",
+      "app_image": "images-app/flower-8.webp",
+      "svg": "faces-svg/flower-8.svg",
+      "name": "Flower",
+      "code": "F",
+      "kind": 34,
+      "copies": 1,
+      "tile_ids": [
+        143
+      ],
+      "variant": 8
+    },
+    {
+      "image": "images/joker.png",
+      "app_image": "images-app/joker.webp",
+      "svg": "faces-svg/joker.svg",
+      "name": "Joker",
+      "code": "J",
+      "kind": 35,
+      "copies": 8,
+      "tile_ids": [
+        144,
+        145,
+        146,
+        147,
+        148,
+        149,
+        150,
+        151
+      ]
+    },
+    {
+      "image": "images/back.png",
+      "app_image": "images-app/back.webp",
+      "svg": "faces-svg/back.svg",
+      "name": "Tile back",
+      "code": null,
+      "kind": null,
+      "copies": 0
+    }
+  ]
+}

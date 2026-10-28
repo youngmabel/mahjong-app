@@ -12,7 +12,9 @@
     "card": "tsx scripts/card-report.ts",
     "sample": "tsx scripts/sample-game.ts",
     "sim": "tsx scripts/simulate.ts",
-    "build": "tsx scripts/build.ts"
+    "build": "tsx scripts/build.ts",
+    "import-tiles": "tsx scripts/import-tiles.ts",
+    "ui-check": "node scripts/ui-check.cjs"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",

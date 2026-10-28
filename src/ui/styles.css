@@ -22,8 +22,8 @@
   --font-ui: 'Lexend', ui-rounded, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --pad-l: max(16px, env(safe-area-inset-left, 0px));
   --pad-r: max(16px, env(safe-area-inset-right, 0px));
-  --t-rack: min(54px, calc((100vw - var(--pad-l) - var(--pad-r) - 41px) / 7));
-  --t-chart: min(30px, calc((100vw - var(--pad-l) - var(--pad-r) - 32px) / 9 - 9px));
+  --t-rack: min(54px, calc((100vw - var(--pad-l) - var(--pad-r) - 44px) / 7));
+  --t-chart: max(18px, min(34px, calc((100vw - var(--pad-l) - var(--pad-r) - 24px) / 9 - 6px), calc((100dvh - 560px) / 4 / 1.422)));
   --t-opp: 20px;
   --t-mine: 30px;
   --t-newest: 38px;
@@ -86,7 +86,8 @@ body {
   padding-left: var(--pad-l);
   padding-right: var(--pad-r);
   -webkit-text-size-adjust: 100%;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 #app {
   height: 100%;
@@ -111,13 +112,21 @@ button {
 .muted {
   color: var(--on-felt-2);
 }
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 
 /* Tiles */
 .tile {
   display: block;
   width: 40px;
   height: auto;
-  aspect-ratio: 64 / 88;
+  aspect-ratio: 64 / 91;
   flex: none;
 }
 .t-rack {
@@ -154,11 +163,11 @@ button {
 
 /* The app grid */
 .app {
-  height: 100%;
+  min-height: 100%;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   grid-template-areas: 'top' 'opps' 'disc' 'msg' 'mine' 'rack' 'actions';
-  grid-template-rows: auto auto minmax(0, 1fr) auto auto auto auto;
+  grid-template-rows: auto auto minmax(min-content, 1fr) auto auto auto auto;
   gap: 6px;
   padding-block: 6px;
 }
@@ -188,7 +197,7 @@ button {
 .topbar {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
 }
 .tb-who {
@@ -196,6 +205,8 @@ button {
   flex-direction: column;
   line-height: 1.15;
   min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
 }
 .tb-game {
   font-size: 11px;
@@ -203,14 +214,23 @@ button {
   text-transform: uppercase;
   color: var(--on-felt-2);
 }
+.tb-dealer {
+  color: var(--brass-2);
+  font-weight: 600;
+}
+.tb-game,
+.tb-seat {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .tb-seat {
   font-size: 14px;
-  white-space: nowrap;
 }
 .tb-stats {
   display: flex;
   gap: 10px;
-  margin-left: auto;
+  flex: none;
   font-variant-numeric: tabular-nums;
 }
 .stat {
@@ -227,7 +247,37 @@ button {
 }
 .tb-nav {
   display: flex;
-  gap: 6px;
+  gap: 4px;
+  flex: none;
+}
+.tb-nav .btn.small {
+  padding: 4px 9px;
+}
+@media (max-width: 440px) {
+  .topbar {
+    gap: 8px;
+  }
+  .tb-stats {
+    gap: 8px;
+  }
+  .tb-nav {
+    gap: 3px;
+  }
+  .tb-nav .btn.small {
+    padding: 4px 7px;
+  }
+}
+@media (max-width: 400px) {
+  .topbar,
+  .tb-stats {
+    gap: 6px;
+  }
+  .tb-game {
+    letter-spacing: 0.03em;
+  }
+  .tb-nav .btn.small {
+    padding: 4px 6px;
+  }
 }
 
 /* Buttons */
@@ -439,17 +489,15 @@ button {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  overflow: auto;
-  min-height: 0;
 }
 .chart-row {
   display: flex;
-  gap: 4px;
+  gap: 3px;
 }
 .cell {
   position: relative;
-  width: calc(var(--t-chart) + 9px);
-  height: calc(var(--t-chart) * 1.375 + 2px);
+  width: calc(var(--t-chart) + 6px);
+  height: calc(var(--t-chart) * 1.422 + 2px);
   padding: 0;
   border: 0;
   background: transparent;
@@ -461,14 +509,14 @@ button {
   left: 0;
   top: 1px;
   width: var(--t-chart);
-  height: calc(var(--t-chart) * 1.375);
+  height: calc(var(--t-chart) * 1.422);
   border-radius: 4px;
   border: 1px dashed var(--felt-line);
 }
 .cell .stack .tile {
   position: absolute;
   top: 1px;
-  left: calc(var(--i, 0) * 3px);
+  left: calc(var(--i, 0) * 2px);
 }
 .cell.is-newest .stack .tile:last-child {
   outline: 2.5px solid var(--brass);
@@ -476,18 +524,20 @@ button {
   border-radius: 4px;
 }
 .cell .count {
+  /* scales with the chart so a small chart's faces stay readable under the badge */
+  --badge: clamp(12px, calc(var(--t-chart) * 0.5), 16px);
   position: absolute;
   right: -2px;
   top: -3px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
+  min-width: var(--badge);
+  height: var(--badge);
+  padding: 0 3px;
   border-radius: 999px;
   background: var(--on-felt);
   color: var(--felt-3);
-  font-size: 11px;
+  font-size: clamp(9px, calc(var(--t-chart) * 0.34), 11px);
   font-weight: 700;
-  line-height: 16px;
+  line-height: var(--badge);
   text-align: center;
 }
 
@@ -601,7 +651,7 @@ button {
   padding-top: 10px;
 }
 .rack-tile.group-start {
-  margin-left: 5px;
+  margin-left: 3px;
 }
 .rack.is-dead {
   opacity: 0.7;
@@ -631,7 +681,7 @@ button {
 .rack-tile.is-new::before {
   content: 'new';
   position: absolute;
-  top: -9px;
+  top: -6px;
   left: 50%;
   transform: translateX(-50%);
   padding: 0 4px;
@@ -652,13 +702,17 @@ button {
   text-overflow: clip;
 }
 
-/* Actions */
+/* Actions. On a screen too short for everything, the page scrolls and the buttons stay pinned to the bottom. */
 .actions {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   align-items: center;
   min-height: 48px;
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  background: var(--felt);
 }
 .status {
   margin: 0;
@@ -702,6 +756,8 @@ button {
   text-wrap: balance;
 }
 .sheet-body {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: auto;
   padding: 12px var(--pad-r) calc(16px + env(safe-area-inset-bottom, 0px)) var(--pad-l);
 }
@@ -999,12 +1055,99 @@ button {
   gap: 8px;
 }
 
+/* Phones held upright. Everything has to fit between the top bar and the buttons, so the pieces are a little
+   tighter, and the discard chart takes whatever height is left over (never smaller than 18px tiles). */
+@media (max-aspect-ratio: 5/4), (max-width: 619px) {
+  :root {
+    --t-opp: 17px;
+    --t-mine: 24px;
+    --t-newest: 30px;
+  }
+  .app {
+    gap: 5px;
+    padding-block: 4px;
+  }
+  .opponents {
+    gap: 3px;
+  }
+  .opp {
+    grid-template-columns: 6.8em auto minmax(0, 1fr);
+    gap: 6px;
+    min-height: 30px;
+    padding: 2px 8px;
+  }
+  .opp-wind {
+    font-size: 13.5px;
+  }
+  .opp-pos {
+    font-size: 10.5px;
+  }
+  .discards {
+    gap: 3px;
+  }
+  .disc-head {
+    font-size: 10px;
+  }
+  .chart,
+  .chart-row {
+    gap: 2px;
+  }
+  .messages {
+    min-height: 0;
+    padding: 5px 9px;
+    gap: 8px;
+  }
+  .mine-label {
+    font-size: 10px;
+  }
+  .rack-area {
+    padding: 4px;
+    gap: 2px;
+  }
+  .rack-head .seg-btn {
+    min-height: 30px;
+  }
+  .rack {
+    padding-top: 8px;
+    row-gap: 3px;
+  }
+  .tile-name {
+    font-size: 9.5px;
+    line-height: 11px;
+  }
+  .actions {
+    gap: 5px;
+    min-height: 44px;
+  }
+  .actions .btn {
+    gap: 6px;
+    padding: 6px 11px;
+    font-size: 14px;
+  }
+  /* The chart fills the space left between the other pieces: its row of the layout decides its height. */
+  @supports (height: 1cqh) {
+    .discards {
+      container-type: size;
+      min-height: calc(23px + 4 * (18px * 1.422 + 2px));
+    }
+    .chart {
+      --t-chart: max(18px, min(48px, calc((100cqw - 70px) / 9), calc(((100cqh - 23px) / 4 - 2px) / 1.422)));
+    }
+  }
+}
+/* Upright phones with a browser's toolbars showing: just the newest message line above the prompt. */
+@media (max-aspect-ratio: 5/4) and (max-height: 760px), (max-width: 619px) and (max-height: 760px) {
+  .messages .line:not(.is-latest) {
+    display: none;
+  }
+}
+
 /* Landscape phones and wider screens: players and messages on the left, the chart on the right. */
 @media (min-aspect-ratio: 5/4) and (min-width: 620px) {
   .app {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas: 'top top' 'opps disc' 'msg disc' 'mine mine' 'rack rack' 'actions actions';
-    grid-template-rows: auto auto minmax(0, 1fr) auto auto auto;
+    grid-template-rows: auto auto minmax(min-content, 1fr) auto auto auto;
     column-gap: 14px;
   }
   .messages {
@@ -1013,14 +1156,14 @@ button {
   }
   :root {
     --t-rack: min(62px, calc((100vw - var(--pad-l) - var(--pad-r) - 13 * 3px - 6 * 9px - 20px) / 14));
-    --t-chart: min(34px, calc((100dvh - 330px) / 4 / 1.375 - 3px));
+    --t-chart: min(34px, calc((100dvh - 330px) / 4 / 1.422 - 3px));
     --t-opp: 22px;
   }
 }
 /* Short landscape screens (phones on their side): tighter spacing. */
 @media (min-aspect-ratio: 5/4) and (max-height: 520px) {
   :root {
-    --t-chart: max(18px, min(30px, calc((100dvh - 268px) / 4 / 1.375 - 2px)));
+    --t-chart: max(18px, min(30px, calc((100dvh - 268px) / 4 / 1.422 - 2px)));
     --t-opp: 18px;
     --t-mine: 24px;
   }
@@ -1040,13 +1183,32 @@ button {
   .rack-area {
     padding: 2px 8px 4px;
   }
+  .opponents {
+    gap: 3px;
+  }
   .opp {
     min-height: 28px;
     padding: 2px 8px;
   }
+  .opp-wind {
+    font-size: 13px;
+  }
+  .opp-pos {
+    font-size: 10px;
+  }
+  .mine {
+    --t-mine: 20px;
+  }
+  .mine-label {
+    font-size: 10px;
+  }
   .messages {
     min-height: 0;
     padding: 4px 8px;
+    --t-newest: 26px;
+  }
+  .messages .line:not(.is-latest) {
+    display: none;
   }
   .tb-game {
     display: none;
@@ -1063,7 +1225,7 @@ button {
     --t-newest: 46px;
     --t-btn: 20px;
     --t-rack: min(66px, calc((100vw - var(--pad-l) - var(--pad-r) - 13 * 3px - 6 * 6px - 20px) / 14));
-    --t-chart: min(46px, calc((100dvh - 360px) / 4 / 1.375 - 3px));
+    --t-chart: min(56px, calc((100dvh - 380px) / 4 / 1.422 - 3px));
   }
   .messages {
     align-self: start;

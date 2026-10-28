@@ -75,8 +75,8 @@ export function PatternSvg({ slot }: { slot: PatternSlot }) {
         : 'any wind';
   return (
     <svg class="tile pattern" viewBox={VIEWBOX} role="img" aria-label={label}>
-      <rect x="1" y="4" width="62" height="83" rx="7" fill="#C9CFD6" />
-      <rect x="1" y="1" width="62" height="83" rx="7" fill="#F4F6F8" stroke="#AEB6C1" stroke-width="1.2" />
+      <rect x="0.5" y="3.5" width="63" height="87" rx="5" fill="#C3CAD3" />
+      <rect x="0.5" y="0.5" width="63" height="87" rx="5" fill="#F2F4F7" stroke="#AEB4BE" />
       <text x="32" y={badge ? 44 : 52} text-anchor="middle" font-size={text.length > 2 ? 20 : 32} font-weight="700" fill="#1E2532" class="tile-font">
         {text}
       </text>

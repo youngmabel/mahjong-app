@@ -33,6 +33,8 @@ export interface Notice {
   text: string;
   /** referee: why a move isn't allowed; info: anything else. */
   tone: 'referee' | 'info';
+  /** The move count when it was shown: it fades once play moves on. null = stays until your next move. */
+  at: number | null;
 }
 
 /** Everything needed to resume exactly where you left off. */
@@ -85,8 +87,9 @@ export class Session {
   constructor(host: SessionHost, prefs: Prefs, saved?: SavedGame | null) {
     this.host = host;
     this.prefs = prefs;
-    const ok = saved ? Session.restorable(saved) : false;
-    if (saved && ok) {
+    const why = saved ? Session.whyNotRestorable(saved) : 'nothing saved';
+    if (saved && why !== null && typeof console !== 'undefined') console.warn(`Starting a new game: the saved game could not be resumed (${why}).`);
+    if (saved && why === null) {
       this.sessionId = saved.sessionId;
       this.state = saved.state;
       this.log = saved.log.slice(-LOG_KEEP);
@@ -108,12 +111,18 @@ export class Session {
 
   /** A saved game can be resumed when it matches this version and every tile is accounted for. */
   static restorable(saved: SavedGame): boolean {
+    return Session.whyNotRestorable(saved) === null;
+  }
+
+  /** Why a saved game can't be resumed (null when it can). */
+  static whyNotRestorable(saved: SavedGame): string | null {
     try {
-      if (!saved || saved.v !== 1 || !saved.state || saved.state.version !== 1) return false;
+      if (!saved || saved.v !== 1 || !saved.state || saved.state.version !== 1) return 'saved by a different version';
       getCard(saved.state.cardId);
-      return checkInvariants(saved.state).length === 0;
-    } catch {
-      return false;
+      const problems = checkInvariants(saved.state);
+      return problems.length === 0 ? null : problems.join('; ');
+    } catch (e) {
+      return e instanceof Error ? e.message : String(e);
     }
   }
 
@@ -140,7 +149,7 @@ export class Session {
   act(action: Action): string | null {
     const r = apply(this.state, HUMAN, action);
     if (!r.ok) {
-      this.notice = { text: r.violation.message, tone: 'referee' };
+      this.notice = { text: r.violation.message, tone: 'referee', at: this.state.actionCount };
       this.host.changed();
       return r.violation.message;
     }
@@ -153,7 +162,7 @@ export class Session {
 
   /** Show a referee explanation without making a move (a dimmed button was tapped). */
   explain(text: string, tone: Notice['tone'] = 'referee'): void {
-    this.notice = { text, tone };
+    this.notice = { text, tone, at: this.state.actionCount };
     this.host.changed();
   }
 
@@ -162,6 +171,12 @@ export class Session {
       this.notice = null;
       this.host.changed();
     }
+  }
+
+  /** The notice to show now: a tap's explanation fades as soon as play moves on. */
+  get currentNotice(): Notice | null {
+    const n = this.notice;
+    return n && (n.at === null || n.at === this.state.actionCount) ? n : null;
   }
 
   setPrefs(prefs: Prefs): void {
@@ -349,7 +364,7 @@ export class Session {
           claim.purpose === 'mahjong' && action.type === 'claimExposure'
             ? 'A Mah Jongg call beats a call for an exposure.'
             : 'When two players call the same discard, the one next in turn after the discarder gets it.';
-        this.notice = { text: `${windOf(this.state, claim.seat)} got that tile instead of you. ${why}`, tone: 'info' };
+        this.notice = { text: `${windOf(this.state, claim.seat)} got that tile instead of you. ${why}`, tone: 'info', at: null };
       }
     }
   }
