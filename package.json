@@ -11,13 +11,18 @@
     "check": "tsc --noEmit && vitest run",
     "card": "tsx scripts/card-report.ts",
     "sample": "tsx scripts/sample-game.ts",
-    "sim": "tsx scripts/simulate.ts"
+    "sim": "tsx scripts/simulate.ts",
+    "build": "tsx scripts/build.ts"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
+    "esbuild": "0.28.2",
     "fast-check": "^4.10.2",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.0.5"
+  },
+  "dependencies": {
+    "preact": "10.29.8"
   }
 }
