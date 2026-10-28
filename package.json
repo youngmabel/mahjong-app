@@ -1,0 +1,23 @@
+{
+  "name": "mahjong-app",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Personal app for learning and practicing American mah jongg (NMJL rules) against three computer opponents.",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "check": "tsc --noEmit && vitest run",
+    "card": "tsx scripts/card-report.ts",
+    "sample": "tsx scripts/sample-game.ts",
+    "sim": "tsx scripts/simulate.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "fast-check": "^4.10.2",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  }
+}
