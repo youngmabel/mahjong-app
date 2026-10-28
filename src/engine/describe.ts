@@ -3,7 +3,7 @@
 import { getCard, sectionSlug } from './card';
 import { PASS_NAMES, windOf } from './engine';
 import type { GameEvent, GameResult } from './state';
-import { JOKER, kindName, kindNamePlural, kindOfTile, type TileId } from './tiles';
+import { JOKER, isWind, kindName, kindNamePlural, kindOfTile, type TileId } from './tiles';
 
 const PASS_DIRECTION = ['to the right', 'across', 'to the left', 'to the left', 'across', 'to the right'];
 const SIZE_NAME: Record<number, string> = { 3: 'pung', 4: 'kong', 5: 'quint', 6: 'sextet' };
@@ -17,7 +17,8 @@ export interface DescribeContext {
 }
 
 function tileName(id: TileId): string {
-  return kindName(kindOfTile(id));
+  const k = kindOfTile(id);
+  return isWind(k) ? `${kindName(k)} wind` : kindName(k);
 }
 
 function article(name: string): string {
