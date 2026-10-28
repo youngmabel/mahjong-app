@@ -183,9 +183,9 @@ export function outs(a: Analysis, jokersHeld: number, live: ArrayLike<number>): 
 /**
  * Privately blocked: from one player's own view, this target can't be finished. `unseen` counts copies
  * the player can't see (supply minus their own tiles, all exposures and all discards). Jokers sitting in
- * other players' exposures still count as obtainable (by joker exchange). Never announced.
+ * any exposure, the player's own included, still count as obtainable (by joker exchange). Never announced.
  */
-export function privatelyBlocked(a: Analysis, jokersHeld: number, unseen: ArrayLike<number>, exposedJokersElsewhere: number): boolean {
+export function privatelyBlocked(a: Analysis, jokersHeld: number, unseen: ArrayLike<number>, exposedJokers: number): boolean {
   let flexNeedFromJokers = 0;
   for (let k = 0; k < NUM_KINDS; k++) {
     if (k === JOKER) continue;
@@ -196,7 +196,7 @@ export function privatelyBlocked(a: Analysis, jokersHeld: number, unseen: ArrayL
     const naturalsLeft = live - mp;
     if (mf > naturalsLeft) flexNeedFromJokers += mf - naturalsLeft;
   }
-  const obtainableJokers = jokersHeld + (unseen[JOKER] as number) + exposedJokersElsewhere;
+  const obtainableJokers = jokersHeld + (unseen[JOKER] as number) + exposedJokers;
   return flexNeedFromJokers > obtainableJokers;
 }
 
@@ -215,8 +215,6 @@ export interface PublicTable {
  */
 export function publiclyPossible(t: Target, ownExposures: PreparedExposures, table: PublicTable): boolean {
   if (!exposuresFit(t, ownExposures)) return false;
-  let ownExposedJokers = 0;
-  for (const e of ownExposures.list) ownExposedJokers += e.jokers;
   let flexNeedFromJokers = 0;
   for (const k of t.kinds) {
     const plainK = t.plain[k] as number;
@@ -226,9 +224,10 @@ export function publiclyPossible(t: Target, ownExposures: PreparedExposures, tab
     const naturalsForFlex = available - plainK;
     if (flexK > naturalsForFlex) flexNeedFromJokers += flexK - naturalsForFlex;
   }
-  // Jokers in other players' exposures can still be won by joker exchange, so only discarded jokers
-  // and the player's own exposed jokers (already in use) are out of reach.
-  const jokersAvailable = JOKER_COUNT - table.discardedJokers - ownExposedJokers;
+  // Every joker not yet discarded still counts: jokers in any exposure, the player's own included, can be
+  // won by joker exchange (docs/01-rules.md sections 8 and 11). This errs on the side of never declaring a
+  // hand dead that might still win; a few provable deaths involving exposed jokers may go undeclared.
+  const jokersAvailable = JOKER_COUNT - table.discardedJokers;
   return flexNeedFromJokers <= jokersAvailable;
 }
 

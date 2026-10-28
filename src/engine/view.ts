@@ -19,7 +19,6 @@ export interface PublicPlayer {
 }
 
 export type PublicPhase =
-  | { name: 'heavenly' }
   | { name: 'charleston'; pass: number; passName: string; blindAllowed: boolean; submitted: boolean[] }
   | { name: 'vote'; voted: boolean[] }
   | { name: 'courtesyOffer'; offered: boolean[] }
@@ -51,9 +50,6 @@ export function seatView(state: GameState, seat: number): SeatView {
   const p = state.phase;
   let phase: PublicPhase;
   switch (p.name) {
-    case 'heavenly':
-      phase = { name: 'heavenly' };
-      break;
     case 'charleston':
       phase = {
         name: 'charleston',

@@ -23,8 +23,8 @@ export interface EvalContext {
   ownExposedJokers: number;
   /** Copies of each kind this seat can't see (in the wall or other players' hidden tiles). */
   unseen: number[];
-  /** Jokers in other players' exposures (they can still be won by joker exchange). */
-  exposedJokersElsewhere: number;
+  /** Jokers in any exposure, this seat's own included (they can still be won by joker exchange). */
+  exposedJokers: number;
   /** Targets that fit this seat's exposures. */
   candidates: Target[];
 }
@@ -73,7 +73,7 @@ export function buildContext(card: Card, cfg: BotConfig, view: SeatView, ownExpo
     exposures: prepared,
     ownExposedJokers,
     unseen,
-    exposedJokersElsewhere: exposedJokersAll - ownExposedJokers,
+    exposedJokers: exposedJokersAll,
     candidates: card.targets.filter((t) => exposuresFit(t, prepared)),
   };
 }
@@ -105,7 +105,7 @@ export function targetScore(t: Target, hand: ArrayLike<number>, ctx: EvalContext
     if (mp > 0 || mf > 0) liveOuts += live;
   }
   const jokers = hand[JOKER] as number;
-  if (cfg.avoidBlocked && flexBeyondNaturals > jokers + (ctx.unseen[JOKER] as number) + ctx.exposedJokersElsewhere) return Infinity;
+  if (cfg.avoidBlocked && flexBeyondNaturals > jokers + (ctx.unseen[JOKER] as number) + ctx.exposedJokers) return Infinity;
   const away = missPlain + (missFlex > jokers ? missFlex - jokers : 0);
   const deficit = Math.max(0, t.minJokers - jokers - ctx.ownExposedJokers);
   let score = away + cfg.plainWeight * missPlain + cfg.jokerDeficitWeight * deficit;

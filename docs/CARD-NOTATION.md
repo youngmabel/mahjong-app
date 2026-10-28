@@ -19,7 +19,8 @@ section | value | X or C | pattern | or: pattern | opt: options | note: small pr
 - **note:** the small print in plain words, shown to the player.
 - **id:** optional. Without it, the id is the section plus the line number, like `2468-3`.
 
-Lines starting with `#` are comments. The file starts with header lines:
+Lines starting with `#` are comments (a `#` later in a line, as in "run #2", is ordinary text). The file
+starts with header lines:
 
 ```
 card: nmjl-2026
@@ -63,7 +64,7 @@ never take jokers; groups of 3 to 6 do.
 | `slide2` | shift by even amounts only (odds stay odd, evens stay even) |
 | `lowest=1,3,5` | the lowest number in the line may only be these (implies slide) |
 | `x=1-9`, `x=1,3,5` | allowed values for a `{x}` variable (default 1 to 9) |
-| `numfree=y` | variable `y` may equal other variables (default: different letters, different numbers) |
+| `numfree=y` | variable `y` may equal other variables (default: different number symbols never become the same tile, so `{x}` and `{y+1}` in one suit can't both be 5s) |
 | `free=r` | the red-ink suit may be the same as another suit (default: different colors, different suits) |
 | `differ=r:g` | with `free`, still require these two suits to differ |
 | `dragon=any` | dragons are not tied to number suits: same color = same dragon, different colors = different dragons |
@@ -71,7 +72,7 @@ never take jokers; groups of 3 to 6 do.
 | `dragon=matching` / `dragon=opposite` | a check: the compiler confirms the dragon colors match (or differ from) the numbers' colors |
 | `wind=any` | winds are not fixed: same letter = same wind, different letters = different winds |
 | `bonus=no` / `bonus=yes` | override the jokerless bonus (default: none for Singles and Pairs or Quints) |
-| `jokers=never` | no jokers anywhere in this line |
+| `jokers=never` | no jokers anywhere in this line (concealed lines only; no NMJL line needs it) |
 
 ## Examples (from the invented practice card)
 

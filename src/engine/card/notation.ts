@@ -248,7 +248,8 @@ export function parseCardText(text: string): ParsedCard {
   const rows = text.split(/\r?\n/);
   for (let i = 0; i < rows.length; i++) {
     const lineNo = i + 1;
-    const raw = (rows[i] as string).replace(/\s+#.*$/, '').trim();
+    // '#' starts a comment only at the start of a line, so notes like "run #2" are safe.
+    const raw = (rows[i] as string).trim();
     if (raw === '' || raw.startsWith('#')) continue;
     if (!raw.includes('|')) {
       const m = /^([a-z]+)\s*:\s*(.+)$/.exec(raw);

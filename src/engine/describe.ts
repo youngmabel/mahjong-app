@@ -61,8 +61,6 @@ export function describeEvent(e: GameEvent, ctx: DescribeContext): string | null
   switch (e.type) {
     case 'deal':
       return `The tiles are shuffled and dealt. ${w(e.dealer)} (the dealer) has 14 tiles; everyone else has 13.`;
-    case 'heavenlyDeclined':
-      return `${w(e.seat)} chose not to declare the dealt hand.`;
     case 'charlestonPassed': {
       const blinds = e.blind
         .map((b, s) => (b > 0 ? `${w(s)} passed ${b} blind` : ''))

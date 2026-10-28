@@ -1,38 +1,72 @@
 # STATUS: Mah Jongg Practice App
 
-Last updated: October 28, 2026 (build chat 1, milestone 1).
+Last updated: October 28, 2026 (build chat 1, milestone 1 complete).
 
 ## Where things live
 
 - **Code, master copy:** the private GitHub repository youngmabel/mahjong-app. Future build chats attach and clone it.
-- **Mirror on your Mac:** MAHJONG/app/, refreshed at the end of each build chat. Treat it as read-only; edits there are overwritten.
-- **Research notes:** MAHJONG/*.md and MAHJONG/research/ on your Mac, copied into the repository's docs/ folder so the repository stands on its own.
+- **Mirror on your Mac:** MAHJONG/app/, refreshed at the end of each build chat. Treat it as read-only; edits there are overwritten. It holds everything in the repository except the copied research notes, which live in MAHJONG/ itself.
+- **Research notes:** MAHJONG/*.md and MAHJONG/research/, also copied into the repository's docs/ folder so the repository stands on its own.
 
 ## Done: milestone 1 (build order steps 1 to 3 in docs/07-app-spec.md section 12)
 
-1. **Tiles and seeded random numbers.** 36 tile kinds, the 152-tile set, plain-English names; sfc32 random streams so any game replays exactly from its seed.
-2. **Card compiler and validator.** An entry notation for typing card lines (docs/CARD-NOTATION.md), compiled to checked data and expanded into every concrete hand. It covers the 2026 features the notes describe: "-or-" layouts, matching, opposite, "any" and literal dragons, flower sextets and separate flower pungs, restricted numbers, even slides, free suits, per-tile colors (three dragons as singles), runs and year singles. Mistakes are explained in plain words.
-3. **Practice card.** The invented card from 07-app-spec section 13: 12 lines, 113 concrete hands (each line's count was predicted by hand and confirmed by the tests).
-4. **Matcher.** Win check, tiles away, missing tiles and outs, exposure fit, Mah Jongg and exposure claims, joker exchanges, privately blocked hands (bots and coach) kept separate from officially dead hands (public evidence only), and tile placement for display.
-5. **Game engine (the referee).** One entry point, apply(state, seat, action), returning the new state and events or a one- or two-sentence reason a move isn't allowed. Covers the deal, Heavenly Hand, both Charlestons with blind passes and the IOU method, the stop vote, the courtesy pass, turns, call windows with Mah Jongg priority and next-in-turn ties, exposures (adjustable until locked), joker exchanges, dead hands, three-dead and wall-game endings, payments, session scores, and the Safety switch.
-6. **Computer opponents, level 2 ("Steady").** They see only their own seat's view, judge tiles against their own candidate hands, pass and blind pass, vote, offer courtesy tiles, call, exchange jokers, play light defense, and never make an illegal move. Difficulty settings for levels 1 and 3 exist as placeholders.
-7. **Tests and tools.** See results below. Scripts: `npm run sample` (a play-by-play), `npm run sim` (statistics), `npm run card` (the card, line by line).
+1. **Tiles and seeded random numbers.** 36 tile kinds, the 152-tile set, plain-English names, and sfc32 random streams, so any game replays exactly from its seed.
+2. **Card compiler and validator.** An entry notation for typing card lines (docs/CARD-NOTATION.md) is compiled to checked data and expanded into every concrete hand. It covers the 2026 features the notes describe:
+   - "-or-" layouts
+   - matching, opposite, "any" and literal dragons
+   - flower sextets and separate flower pungs
+   - restricted numbers, even slides and free suits
+   - per-tile colors (three dragons as singles), runs and year singles
+
+   Mistakes are explained in plain words.
+3. **Practice card.** The invented card from 07-app-spec section 13: 12 lines and 113 concrete hands (each line's count was predicted by hand and confirmed by the tests).
+4. **Matcher.** It covers:
+   - the win check, tiles away, missing tiles and outs
+   - whether exposures fit a hand, and Mah Jongg and exposure claims
+   - joker exchanges
+   - privately blocked hands (for bots and the coach), kept separate from officially dead hands (public evidence only)
+   - which tile goes where, for display
+5. **Game engine (the referee).** One entry point, apply(state, seat, action), returns the new state and events, or a one- or two-sentence reason a move isn't allowed. It covers:
+   - the deal and the Heavenly Hand
+   - both Charlestons, with blind passes and the IOU method, the stop vote and the courtesy pass
+   - turns, and call windows with Mah Jongg priority and next-in-turn ties
+   - exposures (changeable until locked) and joker exchanges
+   - dead hands, and three-dead and wall-game endings
+   - payments, session scores and the Safety switch
+6. **Computer opponents, level 2 ("Steady").** They see only their own seat's view and judge tiles against their own candidate hands. They pass and blind pass, vote, offer courtesy tiles, call, exchange jokers and play light defense, and they never make an illegal move. Levels 1 and 3 exist as placeholders.
+7. **Tools.**
+   - `npm run sample`: a play-by-play
+   - `npm run sim`: statistics
+   - `npm run card`: the card line by line, with an example hand for each line to check against the printed card
 
 ## Results
 
-- **Automatic tests:** 106 passing (tiles, random numbers, card compiler, matcher, brute-force matcher check, rules scenarios, bots, simulations, replay).
+- **Automatic tests:** 126 passing, covering tiles, random numbers, the card compiler, the matcher, the brute-force matcher check, the rules scenarios, edge cases, bots, simulations and replay.
 - **Brute-force check of the matcher:** the fast matcher agreed with an independent slow checker on 6,500 random cases (5,000 seeded, 1,500 generated by fast-check).
-- **Computer-only games:** 2,000 games and 659,638 actions, each checked for all 152 tiles accounted for, legal hand sizes and sound exposures: 0 problems, 0 rejected moves. Another 1,000 games under the alternative rule settings: 0 problems.
-- **Statistics on the practice card** (not comparable to the real card): 93.9% of games ended in Mah Jongg, 6.1% wall games; 73 discards and 5.3 exposures per game; East won 27.6% of wins.
+- **Computer-only games:** 2,000 games and 659,333 actions, each checked for all 152 tiles accounted for, legal hand sizes and sound exposures: 0 problems and 0 rejected moves. Another 1,000 games under the alternative rule settings: 0 problems.
+- **Practice-card statistics** (not comparable to the real card): 94.2% of games ended in Mah Jongg and 5.8% in wall games. Games averaged 73 discards and 5.3 exposures. East won 27.6% of the wins.
+
+## Independent review (October 28, 2026)
+
+A separate reviewer checked the engine against docs/01-rules.md and confirmed each finding with a script. Fixed, with tests:
+
+- **(High)** A hand was declared dead counting a discard that was still claimable. A player whose Mah Jongg tile was that very discard could not claim it. Dead hands are now judged only on settled evidence: a discard counts once it goes unclaimed; a changeable exposure counts only its claimed tile; and the player whose turn it is gets judged when they discard.
+- **(Medium)** The dead-hand check treated jokers in a player's own exposures as unreachable, though a player may take them back by joker exchange. All jokers not yet discarded now count, as docs/01-rules.md section 11 says.
+- **(Medium)** Choice (b) paid any claim-turn win after any joker exchange as self-picked. It now applies only when the exchange completed the hand.
+- **(Low)** A Heavenly Hand caused a pause that told other players East was dealt a complete hand. The dealer now declares during the first pass, so nothing is revealed.
+- **(Low, card entry)** A `#` inside a line cut off the rest. Different number symbols could become the same tile. A "no jokers" option on an exposed line could never accept an exposure; it is now allowed on concealed lines only.
 
 ## Decisions made
 
 - **Where the app lives:** a private Claude artifact for now (Option A), with progress saved in the artifact's private per-person storage. A Home Screen version can be added later; the engine is the same either way.
 - **Where the code lives:** the private GitHub repository, mirrored to MAHJONG/app/.
-- **Safety switch:** ON for the tutorial and guided matches 1 and 2; OFF for match 3; OFF by default in free play (changeable in settings). It only governs legal moves that kill your own hand; illegal moves are always blocked with an explanation.
+- **Safety switch:**
+  - ON for the tutorial and guided matches 1 and 2.
+  - OFF for match 3, and OFF by default in free play (changeable in settings).
+  - It only governs legal moves that kill your own hand; illegal moves are always blocked with an explanation.
 - **Scores:** points (the card's values), with a running session total.
 - **Sound:** off by default.
-- **Stack:** TypeScript 7, Vitest 5, fast-check 4, tsx; Node 22. The engine has no outside dependencies.
+- **Stack:** TypeScript 7, Vitest 5, fast-check 4 and tsx, on Node 22. The engine has no outside dependencies.
 
 ## Labeled rule choices (approved; each is one setting in src/engine/rules.ts)
 
@@ -46,22 +80,58 @@ Last updated: October 28, 2026 (build chat 1, milestone 1).
 | f | Three dead: game ends, nobody pays, the deal passes right | M-H / L |
 | g | Everyone blind passing: the IOU method (dealer passes first, owes the blind tiles) | M |
 | h | The last discard can be claimed for an exposure or Mah Jongg as usual | M (inference) |
-| i | The referee declares dead hands automatically, on public evidence only | design choice |
+| i | The referee declares dead hands automatically, on settled public evidence only | design choice |
 
 The NMJL rulebook *Mah Jongg Made Easy* would settle most of these.
 
-## Known limitations and open items
+## Open questions for you or the rulebook
+
+- **With Safety off, an exposure that fits no hand.** The hand goes dead when the player discards. Right now the exposure stays on the rack and its jokers can still be taken. docs/01-rules.md section 7 says that for an "erroneous exposure" the tiles go back to the rack and those jokers can't be taken. The notes don't say whether a legal pung that fits no hand counts as "erroneous." [L] This only arises with Safety off.
+- **Dead-hand calls never guess.** The referee counts every joker not yet discarded as still obtainable, so it may miss a few provable deaths, but it never declares a hand dead that could still win.
+- **On a nearly empty wall, everyone can be declared dead.** Late in a game, if the table shows that no hand on the card can still be made, players with no exposures can be declared dead too. The game then ends as "three dead" rather than as a wall game. This never happened in 3,000 simulated games, and nobody pays either way.
+
+## Known limitations
 
 - The real 2026 card isn't entered yet (waiting for your card photos). Statistics can only be compared with Gilligan's 2026 numbers after that.
-- Bot tuning: level 2 bots expose often (about 5 exposures per game) and win 94% of practice games; retune against the real card. Levels 1 and 3 are placeholders.
+- Bot tuning: level 2 bots expose often (about 5 exposures per game) and win 94% of practice games. They need retuning against the real card. Levels 1 and 3 are placeholders.
 - The IOU blind-pass method follows Tom Sloper's description; the NMJL's 2020 rule text wasn't found.
 - No screens yet: the engine is tested but not playable by hand.
 
 ## What's next
 
-- **Milestone 2:** build order step 4 (a minimal playable screen: rack, discards, exposures, action buttons, cheat sheet), published as a private Claude artifact; then step 5 (the coach and guided-match mode).
+- **Milestone 2:** build order step 4, a minimal playable screen (rack, discards, exposures, action buttons, cheat sheet) published as a private Claude artifact. Then step 5, the coach and the guided-match mode.
 - **When your card photos arrive:** step 8, entering and checking the 2026 card (docs/03-card-2026.md section 7).
 
 ## How to run
 
-On a Mac with Node.js 22 or later, in the app folder: `npm install` once, then `npm test`, `npm run sample`, `npm run sim`, `npm run card`.
+On a Mac with Node.js 22 or later, in the app folder, run `npm install` once. Then `npm test`, `npm run sample`, `npm run sim` and `npm run card`.
+
+## Prompt for the next chat
+
+```text
+I'm building a personal app (never commercial) for learning and practicing American mah jongg (National Mah Jongg League rules) solo against three computer opponents, using the 2026 NMJL card and a 152-tile set with no blanks. Milestone 1 is done: the rules engine, the card compiler with an invented practice card, level 2 computer opponents, and 126 passing tests. Your job in this chat is milestone 2: the first playable screen.
+
+READ FIRST
+1. STATUS.md in my private GitHub repository youngmabel/mahjong-app (attach the repository and clone it; it is the master copy of the code). The same STATUS.md is in my MAHJONG folder (/Users/youngmabel/Documents/MAHJONG).
+2. In the repository's docs/ folder: 07-app-spec.md (sections 2, 3, 8 and 12), 08-design-ideas.md, 05-teaching-plan.md, and 01-rules.md as needed.
+3. The engine's public pieces: src/engine/engine.ts (apply, pendingSeats, callOptions), src/engine/view.ts, src/engine/describe.ts and src/sim/runner.ts.
+
+DECISIONS ALREADY MADE (details in STATUS.md)
+- Standard NMJL rules, no house rules, no blank tiles. Our own tile art and our own card layout.
+- The app is a private Claude artifact, with progress saved in the artifact's private per-person storage.
+- The code lives in the GitHub repository; MAHJONG/app/ is a read-only mirror refreshed at the end of each chat.
+- Safety switch ON for the tutorial and guided matches 1 and 2, OFF for match 3 and (by default) free play. Scores in points. Sound off by default.
+- Nine labeled rule choices (a to i) are approved and listed in STATUS.md.
+
+WHAT I WANT FROM YOU IN THIS CHAT
+1. Read the notes. Then give me a short plan for milestone 2: build order step 4, a minimal playable screen (my rack, the discards, every player's exposures, buttons for every move the engine allows, a cheat sheet of the practice-card hands, and the plain-English message line), published as a private Claude artifact. Ask me to decide anything open (for example the tile art direction in 08-design-ideas.md section 2, and landscape versus portrait on iPhone), with a recommendation for each.
+2. After I approve, build it without changing the engine's rules (bug fixes only, each with a test).
+3. Show me it works: publish the artifact so I can play a full game against the computer on my Mac and iPhone, with all tests still passing.
+4. Before the chat ends, update STATUS.md (in the repository and my MAHJONG folder), push to GitHub, refresh MAHJONG/app/, and give me a paste-ready prompt for the next chat.
+If I attach photos of my 2026 card, also enter it (build step 8, following docs/03-card-2026.md section 7 and docs/CARD-NOTATION.md) and show me the line-by-line check.
+
+GROUND RULES
+- I'm not an experienced programmer. Make the technical calls yourself and explain them in plain words.
+- Take rules from docs/01-rules.md (and the NMJL rulebook "Mah Jongg Made Easy" if I buy it). Don't invent rules. Where the notes mark something as medium or low confidence, flag it to me rather than guessing.
+- The engine is the referee: prevent illegal moves and explain them in a sentence or two.
+```

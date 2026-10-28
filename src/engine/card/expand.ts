@@ -195,6 +195,36 @@ function buildTarget(hand: CompiledHand, handIndex: number, altIndex: number, gr
   };
 }
 
+/** Which printed number symbol a tile came from: a literal digit, or a variable plus offset. */
+function numberSource(tile: CompiledTile): { key: string; v: string | null } | null {
+  if (tile.t === 'num') return { key: `L${tile.n}`, v: null };
+  if (tile.t === 'numVar') return { key: `V${tile.v}${tile.off >= 0 ? '+' : ''}${tile.off}`, v: tile.v };
+  return null;
+}
+
+/**
+ * Different number symbols name different tiles: "{x}" and "{y+1}" in one suit may not both become 5 Dots
+ * (docs/CARD-NOTATION.md: different letters, different numbers), unless a variable involved is numfree.
+ * The same symbol repeated (like the two 2s in "2026") is of course the same tile.
+ */
+function numbersCollide(alt: CompiledAlternative, groups: TargetGroup[]): boolean {
+  const seen = new Map<Kind, { key: string; v: string | null }>();
+  for (let i = 0; i < alt.groups.length; i++) {
+    const src = numberSource((alt.groups[i] as { tile: CompiledTile }).tile);
+    if (!src) continue;
+    const kind = (groups[i] as TargetGroup).kind;
+    const prev = seen.get(kind);
+    if (!prev) {
+      seen.set(kind, src);
+      continue;
+    }
+    if (prev.key === src.key) continue;
+    const free = (prev.v !== null && alt.numFree.includes(prev.v)) || (src.v !== null && alt.numFree.includes(src.v));
+    if (!free) return true;
+  }
+  return false;
+}
+
 export interface HandExpansion {
   targets: Omit<Target, 'index'>[];
   /** How many suit and number choices were dropped because the set doesn't have enough tiles. */
@@ -225,6 +255,7 @@ export function expandHand(hand: CompiledHand, handIndex: number): HandExpansion
               groups.push({ kind, size: g.size, jokers: g.jokers, word: g.word });
             }
             if (!ok) continue;
+            if (numbersCollide(alt, groups)) continue;
             const t = buildTarget(hand, handIndex, altIndex, groups);
             if (!t) {
               droppedForSupply++;

@@ -227,9 +227,26 @@ describe('notation features the 2026 card needs', () => {
     expect(lineTargets('Test | 25 | X | FF 1111g 2222g 33r 44r | opt: free=r').length).toBe(9);
   });
 
-  it('jokers=never makes every group natural-only', () => {
-    const ts = lineTargets('Test | 25 | X | FF 1111g 2222g 3333g | opt: jokers=never');
+  it('jokers=never makes every group natural-only, on concealed lines only', () => {
+    const ts = lineTargets('Test | 25 | C | FF 1111g 2222g 3333g | opt: jokers=never');
     for (const g of ts[0]?.groups ?? []) expect(g.jokers).toBe(false);
+    expectCardError(HEADER + 'Test | 25 | X | FF 1111g 2222g 3333g | opt: jokers=never', 'only on concealed');
+  });
+
+  it('treats # as a comment only at the start of a line', () => {
+    expect(lineTargets('Test | 25 | X | 11g 222g 3333g 444g 55g | note: like run #2 | opt: slide').length).toBe(15);
+    expect(lineTargets('# a comment line\nTest | 25 | X | FF 1111g 2222g 3333g').length).toBe(3);
+  });
+
+  it('never lets two different number symbols become the same tile (unless numfree)', () => {
+    // Three kongs {x}, {y}, {y+1} in one suit: every set of 3 different numbers that includes two
+    // consecutive ones (84 sets minus the 35 with no consecutive pair = 49), per suit. Different (x, y)
+    // choices that give the same tiles count once.
+    const ts = lineTargets('Test | 25 | X | FF {x}{x}{x}{x}g {y}{y}{y}{y}g {y+1}{y+1}{y+1}{y+1}g');
+    expect(ts.length).toBe(3 * 49);
+    for (const t of ts) expect(new Set(t.groups.map((g) => g.kind)).size).toBe(t.groups.length);
+    // numfree=x adds the 16 ways for x to repeat y or y+1 (two kongs of one tile, which needs four jokers)
+    expect(lineTargets('Test | 25 | X | FF {x}{x}{x}{x}g {y}{y}{y}{y}g {y+1}{y+1}{y+1}{y+1}g | opt: numfree=x').length).toBe(3 * (49 + 16));
   });
 
   it('round-trips the pattern notation', () => {

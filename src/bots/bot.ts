@@ -41,9 +41,10 @@ function decide(view: SeatView, cfg: BotConfig, rng: Rng): Action {
   const card = getCard(view.cardId);
   const p = view.phase;
   switch (p.name) {
-    case 'heavenly':
-      return cfg.neverDeclare ? { type: 'proceed' } : { type: 'declareMahjong' };
     case 'charleston':
+      // A hand dealt complete (Heavenly Hand) is declared before the first pass.
+      if (p.pass === 0 && view.seat === view.dealer && !cfg.neverDeclare && completedTargets(card, countsOf(view.hand), []).length > 0)
+        return { type: 'declareMahjong' };
       return charlestonPass(view, card, cfg, p.blindAllowed);
     case 'vote': {
       const pos = evaluatePosition(countsOf(view.hand), buildContext(card, cfg, view));

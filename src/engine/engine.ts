@@ -69,9 +69,12 @@ export interface NewGameOptions {
   scores?: number[];
 }
 
-/** Shuffle with the seed's wall stream, deal East 14 and everyone else 13, and check for a Heavenly Hand. */
+/**
+ * Shuffle with the seed's wall stream and deal East 14, everyone else 13. A hand dealt complete (Heavenly
+ * Hand) is declared by the dealer during the first Charleston pass, before choosing tiles.
+ */
 export function newGame(opts: NewGameOptions): { state: GameState; events: GameEvent[] } {
-  const card = getCard(opts.cardId);
+  getCard(opts.cardId); // throws if the card isn't loaded
   const dealer = opts.dealer ?? 0;
   const wall = Rng.fromSeed(streamSeed(opts.seed, 'wall')).shuffle(allTileIds());
   const players = [0, 1, 2, 3].map(() => ({ hand: [] as TileId[], exposures: [] as Exposure[], dead: null }));
@@ -95,8 +98,6 @@ export function newGame(opts: NewGameOptions): { state: GameState; events: GameE
     rng: Rng.fromSeed(streamSeed(opts.seed, 'engine')).getState(),
     actionCount: 0,
   };
-  const dealerHand = countsOf((state.players[dealer] as { hand: TileId[] }).hand);
-  if (completedTargets(card, dealerHand, []).length > 0) state.phase = { name: 'heavenly' };
   return { state, events: [{ type: 'deal', dealer }] };
 }
 
@@ -111,8 +112,6 @@ export function nextGame(prev: GameState, seed: string): { state: GameState; eve
 export function pendingSeats(state: GameState): number[] {
   const p = state.phase;
   switch (p.name) {
-    case 'heavenly':
-      return [state.dealer];
     case 'charleston':
       return [0, 1, 2, 3].filter((s) => p.selections[s] === null);
     case 'vote':
@@ -143,7 +142,7 @@ export function playerExposureInfo(state: GameState, seat: number): ExposureInfo
   return (state.players[seat] as GameState['players'][number]).exposures.map(exposureInfo);
 }
 
-/** What everyone can see: all discards on the table and every exposed tile. */
+/** What everyone can see right now: every discard on the table and every exposed tile. */
 export function publicTable(state: GameState): PublicTable {
   const visibleNaturals = emptyCounts();
   let discardedJokers = 0;
@@ -159,6 +158,46 @@ export function publicTable(state: GameState): PublicTable {
         if (k !== JOKER) visibleNaturals[k]++;
       }
   return { visibleNaturals, discardedJokers };
+}
+
+/**
+ * Settled public evidence for judging one seat's hand dead (docs/01-rules.md section 11): the discards
+ * on the table, except a discard this seat may still claim (the call window is open); the real tiles of
+ * locked exposures; and only the claimed tile of an exposure its owner can still change. The seat's own
+ * exposures are left out; callers add them.
+ */
+function evidenceFor(state: GameState, seat: number, windowOpen: boolean): PublicTable {
+  const visibleNaturals = emptyCounts();
+  let discardedJokers = 0;
+  const p = state.phase;
+  const live = windowOpen && p.name === 'callWindow' && p.discarder !== seat ? p.tile : null;
+  for (const f of state.floor) {
+    const k = kindOfTile(f.tile);
+    if (k === JOKER) discardedJokers++;
+    else if (f.tile !== live) visibleNaturals[k]++;
+  }
+  state.players.forEach((pl, owner) => {
+    if (owner === seat) return;
+    for (const e of pl.exposures) {
+      if (!e.locked) {
+        visibleNaturals[e.kind]++; // only the claimed tile is settled
+        continue;
+      }
+      for (const id of e.tiles) {
+        const k = kindOfTile(id);
+        if (k !== JOKER) visibleNaturals[k]++;
+      }
+    }
+  });
+  return { visibleNaturals, discardedJokers };
+}
+
+/** Would this seat's hand be officially dead with these exposures of its own? (null = no) */
+function deadReasonWithOwn(state: GameState, seat: number, own: ExposureInfo[], windowOpen: boolean): DeadCode | null {
+  const table = evidenceFor(state, seat, windowOpen);
+  const visible = table.visibleNaturals as number[];
+  for (const e of own) visible[e.kind] = (visible[e.kind] as number) + (e.size - e.jokers);
+  return officialDeadReason(getCard(state.cardId), prepareExposures(own), table);
 }
 
 /** Every exposed joker, with the tile it stands for. */
@@ -200,22 +239,10 @@ export function callOptions(state: GameState, seat: number): { mahjong: boolean;
   return { mahjong, exposures };
 }
 
-/**
- * Would this player's hand be officially dead with these exposures? `addedNaturals` is how many more real
- * tiles of `kind` become visible (moved from the hidden rack into the exposure). null = not dead.
- */
-function deadReasonWith(state: GameState, exposures: ExposureInfo[], kind: Kind, addedNaturals: number): DeadCode | null {
-  const card = getCard(state.cardId);
-  const table = publicTable(state);
-  const visible = Array.from(table.visibleNaturals);
-  visible[kind] = (visible[kind] as number) + addedNaturals;
-  return officialDeadReason(card, prepareExposures(exposures), { visibleNaturals: visible, discardedJokers: table.discardedJokers });
-}
-
 /** If this player claimed the current discard for this exposure, would their hand be officially dead? (null = no) */
 export function exposureDeadReason(state: GameState, seat: number, kind: Kind, size: number, jokers: number): DeadCode | null {
-  // the claimed tile was already visible on the floor; the real tiles from the rack become visible too
-  return deadReasonWith(state, [...playerExposureInfo(state, seat), { kind, size, jokers }], kind, size - 1 - jokers);
+  // The claimed discard leaves the table and joins the exposure with the real tiles from the rack.
+  return deadReasonWithOwn(state, seat, [...playerExposureInfo(state, seat), { kind, size, jokers }], true);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -260,8 +287,6 @@ function notPendingReason(state: GameState, seat: number): Violation | null {
   const p = state.phase;
   const w = (x: number) => windOf(state, x);
   switch (p.name) {
-    case 'heavenly':
-      return violation('waitForDealer', `${w(state.dealer)} was dealt a complete hand and is deciding whether to declare it.`);
     case 'charleston':
     case 'courtesyPass':
       return violation('alreadyPassed', 'You have already chosen your tiles for this pass. Waiting for the other players.');
@@ -283,8 +308,6 @@ function notPendingReason(state: GameState, seat: number): Violation | null {
 function dispatch(ctx: Ctx, seat: number, action: Action): Violation | null {
   const p = ctx.s.phase;
   switch (p.name) {
-    case 'heavenly':
-      return onHeavenly(ctx, seat, action);
     case 'charleston':
       return onCharleston(ctx, p, seat, action);
     case 'vote':
@@ -325,29 +348,12 @@ function wrongAction(what: string): Violation {
   return violation('wrongAction', what);
 }
 
-// --- Heavenly Hand --------------------------------------------------------------------------------
-
-function onHeavenly(ctx: Ctx, seat: number, action: Action): Violation | null {
-  if (action.type === 'declareMahjong') {
-    const targets = completedTargets(ctx.card, countsOf(hand(ctx, seat)), []);
-    const best = targets[0];
-    if (!best) return violation('notComplete', "Your tiles don't match any hand on the card.");
-    endMahjong(ctx, seat, 'heavenly', best, null);
-    return null;
-  }
-  if (action.type === 'proceed') {
-    ctx.events.push({ type: 'heavenlyDeclined', seat });
-    ctx.s.phase = { name: 'charleston', pass: 0, selections: [null, null, null, null] };
-    return null;
-  }
-  return wrongAction('You were dealt a complete hand: declare Mah Jongg now (a Heavenly Hand), or carry on to the Charleston.');
-}
-
 // --- Charleston -----------------------------------------------------------------------------------
 
 const JOKER_PASS_MESSAGE = 'Jokers can never be passed, in any Charleston pass or the courtesy pass. Choose a different tile.';
 
 function onCharleston(ctx: Ctx, p: Extract<Phase, { name: 'charleston' }>, seat: number, action: Action): Violation | null {
+  if (action.type === 'declareMahjong') return heavenlyHand(ctx, p, seat);
   if (action.type !== 'charlestonPass') return wrongAction(`Choose 3 tiles to pass ${PASS_NAMES[p.pass]}.`);
   const blind = action.blind ?? 0;
   if (!Number.isInteger(blind) || blind < 0 || blind > 3) return violation('badBlind', 'A blind pass forwards 1 to 3 of the incoming tiles.');
@@ -366,6 +372,24 @@ function onCharleston(ctx: Ctx, p: Extract<Phase, { name: 'charleston' }>, seat:
   if (action.tiles.some((t) => kindOfTile(t) === JOKER)) return violation('jokerPass', JOKER_PASS_MESSAGE);
   p.selections[seat] = { tiles: [...action.tiles], blind };
   if (p.selections.every((x) => x !== null)) resolveCharlestonPass(ctx, p);
+  return null;
+}
+
+/**
+ * Heavenly Hand: the dealer's 14 dealt tiles already make a hand. The dealer declares at once, before
+ * passing, and the Charleston is skipped; it is paid as a self-pick (docs/01-rules.md section 3) [H].
+ */
+function heavenlyHand(ctx: Ctx, p: Extract<Phase, { name: 'charleston' }>, seat: number): Violation | null {
+  if (seat !== ctx.s.dealer)
+    return violation('notYourTurn', 'You can declare Mah Jongg only on your own turn, holding 14 tiles. Choose 3 tiles to pass.');
+  if (p.pass !== 0)
+    return violation(
+      'heavenlyTooLate',
+      'Once the Charleston has started, East declares Mah Jongg (if the hand is complete) instead of making the first discard.',
+    );
+  const best = completedTargets(ctx.card, countsOf(hand(ctx, seat)), [])[0];
+  if (!best) return violation('notComplete', "Your tiles don't match any hand on the card, so you can't declare Mah Jongg.");
+  endMahjong(ctx, seat, 'heavenly', best, null);
   return null;
 }
 
@@ -488,7 +512,7 @@ function onCourtesyPass(ctx: Ctx, p: Extract<Phase, { name: 'courtesyPass' }>, s
 
 function startPlay(ctx: Ctx): void {
   ctx.events.push({ type: 'playStarts', dealer: ctx.s.dealer });
-  ctx.s.phase = { name: 'turn', seat: ctx.s.dealer, source: 'deal', from: null, exchanged: false, redeemed: [] };
+  ctx.s.phase = { name: 'turn', seat: ctx.s.dealer, source: 'deal', from: null, exchanged: false, redeemed: [], completedBy: null };
 }
 
 // --- A player's turn -------------------------------------------------------------------------------
@@ -505,8 +529,9 @@ function onTurn(ctx: Ctx, p: Extract<Phase, { name: 'turn' }>, seat: number, act
       let from: number | null = null;
       if (p.source === 'deal') how = 'eastFirst';
       else if (p.source === 'draw') how = 'selfDraw';
-      else if (p.exchanged && s.rules.jokerExchangeWin === 'selfPick') how = 'jokerExchange';
+      else if (p.completedBy === 'exchange' && s.rules.jokerExchangeWin === 'selfPick') how = 'jokerExchange';
       else {
+        // complete with the claimed discard itself: a win on that discard
         how = 'discard';
         from = p.from;
       }
@@ -527,12 +552,14 @@ function onTurn(ctx: Ctx, p: Extract<Phase, { name: 'turn' }>, seat: number, act
           'exchangeWrongTile',
           `That joker stands for a ${kindName(exp.kind)}, so only a real ${kindName(exp.kind)} can take it.`,
         );
+      const wasComplete = seatComplete(ctx, seat);
       removeTiles(pl.hand, [action.tile]);
       exp.tiles[exp.tiles.indexOf(jokerId)] = action.tile;
       pl.hand.push(jokerId);
       if (s.rules.exposureLock === 'discardOrExchange') for (const e of pl.exposures) e.locked = true;
       p.exchanged = true;
       p.redeemed.push(jokerId);
+      updateCompletedBy(ctx, p, seat, wasComplete, 'exchange');
       ctx.events.push({ type: 'jokerExchange', seat, owner: action.owner, exposure: action.exposure, kind });
       afterPublicChange(ctx);
       return null;
@@ -589,18 +616,32 @@ function amendExposure(ctx: Ctx, p: Extract<Phase, { name: 'turn' }>, seat: numb
   if (tiles.length < 3 || tiles.length > 6) return violation('exposureSize', 'An exposure is a pung, kong, quint or sextet (3 to 6 tiles).');
   const jokers = tiles.filter((t) => kindOfTile(t) === JOKER).length;
   if (s.rules.safety) {
-    const others = pl.exposures.filter((_, i) => i !== action.exposure).map(exposureInfo);
-    const oldNaturals = exp.tiles.length - exposureInfo(exp).jokers;
-    const reason = deadReasonWith(s, [...others, { kind: exp.kind, size: tiles.length, jokers }], exp.kind, tiles.length - jokers - oldNaturals);
+    const own = pl.exposures.map((e, i) => (i === action.exposure ? { kind: exp.kind, size: tiles.length, jokers } : exposureInfo(e)));
+    const reason = deadReasonWithOwn(s, seat, own, false);
     if (reason) return violation('exposureKillsHand', exposureKillsMessage(reason));
   }
+  const wasComplete = seatComplete(ctx, seat);
   const back = exp.tiles.filter((t) => !tiles.includes(t));
   const taken = tiles.filter((t) => !exp.tiles.includes(t));
   removeTiles(pl.hand, taken);
   pl.hand.push(...back);
   exp.tiles = [exp.claimedTile, ...tiles.filter((t) => t !== exp.claimedTile)];
+  updateCompletedBy(ctx, p, seat, wasComplete, 'other');
   ctx.events.push({ type: 'amendExposure', seat, exposure: action.exposure, size: tiles.length, jokers });
   return null;
+}
+
+function seatComplete(ctx: Ctx, seat: number): boolean {
+  const pl = ctx.s.players[seat] as GameState['players'][number];
+  return completedTargets(ctx.card, countsOf(pl.hand), pl.exposures.map(exposureInfo)).length > 0;
+}
+
+/** Track what made a claimer's hand complete, for labeled choice (b). */
+function updateCompletedBy(ctx: Ctx, p: Extract<Phase, { name: 'turn' }>, seat: number, wasComplete: boolean, cause: 'exchange' | 'other'): void {
+  if (p.source !== 'claim') return;
+  const nowComplete = seatComplete(ctx, seat);
+  if (!nowComplete) p.completedBy = null;
+  else if (!wasComplete) p.completedBy = cause;
 }
 
 // --- Call window --------------------------------------------------------------------------------------
@@ -693,10 +734,13 @@ function resolveCallWindow(ctx: Ctx): void {
     const info = exposureInfo(pl.exposures[pl.exposures.length - 1] as Exposure);
     ctx.events.push({ type: 'claim', seat: ex, tile: p.tile, from: p.discarder, purpose: 'exposure' });
     ctx.events.push({ type: 'expose', seat: ex, exposure: pl.exposures.length - 1, kind, size: info.size, jokers: info.jokers });
-    s.phase = { name: 'turn', seat: ex, source: 'claim', from: p.discarder, exchanged: false, redeemed: [] };
+    s.phase = { name: 'turn', seat: ex, source: 'claim', from: p.discarder, exchanged: false, redeemed: [], completedBy: null };
+    if (seatComplete(ctx, ex)) s.phase.completedBy = 'other';
     afterPublicChange(ctx);
     return;
   }
+  // Nobody claimed it: the discard is now dead on the table. Judge dead hands with it before the next draw.
+  if (declareDeadHands(ctx, false)) return;
   drawNext(ctx, p.discarder);
 }
 
@@ -721,7 +765,7 @@ function drawNext(ctx: Ctx, after: number): void {
   }
   (s.players[next] as GameState['players'][number]).hand.push(tile);
   ctx.events.push({ type: 'draw', seat: next, tile, wallLeft: s.wall.length });
-  s.phase = { name: 'turn', seat: next, source: 'draw', from: null, exchanged: false, redeemed: [] };
+  s.phase = { name: 'turn', seat: next, source: 'draw', from: null, exchanged: false, redeemed: [], completedBy: null };
 }
 
 // --- Dead hands, endings ------------------------------------------------------------------------------
@@ -734,19 +778,20 @@ export function deadMessage(state: Pick<GameState, 'dealer'>, seat: number, code
 }
 
 /**
- * After anything that changes what the table can see: declare dead hands (public evidence only), end the
- * game if three players are dead, and keep the turn or call window moving past dead players.
+ * Declare dead hands on settled public evidence only (docs/01-rules.md section 11). Skipped: the player
+ * whose turn it is (judged when they discard, since an exposure can be fixed until then) and any player
+ * who can still change an exposure. Returns true if the game ended because three players are dead.
  */
-function afterPublicChange(ctx: Ctx): void {
+function declareDeadHands(ctx: Ctx, windowOpen: boolean): boolean {
   const s = ctx.s;
   if (s.rules.autoDeclareDead) {
-    const table = publicTable(s);
+    const p = s.phase;
     for (let seat = 0; seat < 4; seat++) {
       const pl = s.players[seat] as GameState['players'][number];
       if (pl.dead) continue;
-      // a player may still fix an exposure until it locks
+      if (p.name === 'turn' && p.seat === seat) continue;
       if (pl.exposures.some((e) => !e.locked)) continue;
-      const code = officialDeadReason(ctx.card, prepareExposures(pl.exposures.map(exposureInfo)), table);
+      const code = deadReasonWithOwn(s, seat, pl.exposures.map(exposureInfo), windowOpen);
       if (code) {
         const message = deadMessage(s, seat, code);
         pl.dead = { code, message };
@@ -756,11 +801,23 @@ function afterPublicChange(ctx: Ctx): void {
   }
   if (s.players.filter((pl) => pl.dead).length >= 3) {
     endNoWinner(ctx, 'threeDead');
-    return;
+    return true;
   }
+  return false;
+}
+
+/**
+ * After anything that changes what the table can see: declare dead hands, end the game if three players
+ * are dead, and keep the call window moving past dead players. While a call window is open, the discard
+ * still counts as available to everyone but the discarder, since it may yet be claimed.
+ */
+function afterPublicChange(ctx: Ctx): void {
+  const s = ctx.s;
+  const windowOpen = s.phase.name === 'callWindow';
+  if (declareDeadHands(ctx, windowOpen)) return;
   const p = s.phase;
   if (p.name === 'turn' && !isLive(s, p.seat)) {
-    drawNext(ctx, p.seat); // a dead player stops playing
+    drawNext(ctx, p.seat); // safety net: a dead player stops playing
   } else if (p.name === 'callWindow') {
     p.eligible = p.eligible.filter((q) => isLive(s, q));
     if (p.eligible.every((q) => p.responses[q] !== null)) resolveCallWindow(ctx);
@@ -839,7 +896,7 @@ export function checkInvariants(state: GameState): string[] {
   };
   for (let seat = 0; seat < 4; seat++) {
     const live = isLive(state, seat);
-    if (p.name === 'heavenly' || p.name === 'charleston' || p.name === 'vote' || p.name === 'courtesyOffer' || p.name === 'courtesyPass') {
+    if (p.name === 'charleston' || p.name === 'vote' || p.name === 'courtesyOffer' || p.name === 'courtesyPass') {
       expect(seat, seat === state.dealer ? 14 : 13);
     } else if (p.name === 'turn') {
       expect(seat, seat === p.seat ? 14 : live ? 13 : [13, 14]);

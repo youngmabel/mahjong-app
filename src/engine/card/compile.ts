@@ -171,6 +171,9 @@ function compileAlternative(words: PatternWord[], display: string, opts: ParsedO
 
 export function compileLine(line: ParsedLine, lineInSection: number): CompiledHand {
   const id = line.id ?? `${sectionSlug(line.section)}-${lineInSection}`;
+  // A no-jokers exposed line would need exposures matched to joker-free groups, which no NMJL line uses.
+  if (line.options.jokersNever && !line.concealed)
+    throw new CardError('jokers=never is supported only on concealed (C) lines.', line.lineNo);
   const alternatives = line.patterns.map((p, i) => compileAlternative(p, line.patternTexts[i] as string, line.options, line.lineNo));
   return {
     id,

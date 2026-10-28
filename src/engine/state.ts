@@ -62,9 +62,11 @@ export type GameResult =
   | { type: 'threeDead'; payments: number[] };
 
 export type Phase =
-  /** The dealer was dealt a complete hand and may declare it (Heavenly Hand). */
-  | { name: 'heavenly' }
-  /** Charleston pass 0..5: right, across, left, then (second Charleston) left, across, right. */
+  /**
+   * Charleston pass 0..5: right, across, left, then (second Charleston) left, across, right.
+   * During pass 0, before choosing tiles, the dealer may declare a hand dealt complete (Heavenly Hand);
+   * folding that decision into the first pass keeps it private, as at a real table.
+   */
   | { name: 'charleston'; pass: number; selections: (CharlestonSelection | null)[] }
   /** After the first Charleston: does everyone want the second one? Any single "stop" ends it. */
   | { name: 'vote'; votes: (boolean | null)[] }
@@ -80,6 +82,12 @@ export type Phase =
       exchanged: boolean;
       /** Jokers taken by exchange this turn (they may not join an exposure made this turn). */
       redeemed: TileId[];
+      /**
+       * For a claimed tile: what last made the hand complete during this turn. 'other' when it was complete
+       * right after the claim (or an exposure change completed it), 'exchange' when a joker exchange did,
+       * null while incomplete. Labeled choice (b) applies only to 'exchange'.
+       */
+      completedBy: 'exchange' | 'other' | null;
     }
   /** A discard is down: each live player answers pass, Mah Jongg, or expose. */
   | { name: 'callWindow'; tile: TileId; discarder: number; eligible: number[]; responses: (CallResponse | null)[] }
@@ -108,7 +116,6 @@ export interface GameState {
 
 export type Action =
   | { type: 'declareMahjong' }
-  | { type: 'proceed' }
   | { type: 'charlestonPass'; tiles: TileId[]; blind?: number }
   | { type: 'charlestonVote'; continue: boolean }
   | { type: 'courtesyOffer'; count: number }
@@ -122,7 +129,6 @@ export type Action =
 
 export type GameEvent = { to?: number } & (
   | { type: 'deal'; dealer: number }
-  | { type: 'heavenlyDeclined'; seat: number }
   | { type: 'charlestonPassed'; pass: number; blind: number[]; iou: boolean }
   | { type: 'tilesReceived'; seat: number; tiles: TileId[]; pass: number | 'courtesy' }
   | { type: 'secondCharleston'; played: boolean; stoppedBy: number[] }

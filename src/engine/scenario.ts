@@ -24,8 +24,7 @@ export type ScenarioPhase =
   | { name: 'courtesyOffer' }
   | { name: 'turn'; seat: number; source?: 'deal' | 'draw' | 'claim'; from?: number }
   /** The discard must be the last entry of `floor`. */
-  | { name: 'callWindow'; discarder: number }
-  | { name: 'heavenly' };
+  | { name: 'callWindow'; discarder: number };
 
 export interface ScenarioSetup {
   seed: string;
@@ -83,7 +82,7 @@ export function buildScenario(setup: ScenarioSetup): GameState {
   const rng = Rng.fromSeed(streamSeed(setup.seed, 'scenario'));
   rng.shuffle(pool);
   const ph = setup.phase;
-  const beforePlay = ph.name === 'charleston' || ph.name === 'vote' || ph.name === 'courtesyOffer' || ph.name === 'heavenly';
+  const beforePlay = ph.name === 'charleston' || ph.name === 'vote' || ph.name === 'courtesyOffer';
   for (let seat = 0; seat < 4; seat++) {
     if (setup.hands?.[seat] !== undefined) continue;
     const pl = players[seat] as GameState['players'][number];
@@ -115,11 +114,8 @@ export function buildScenario(setup: ScenarioSetup): GameState {
     case 'courtesyOffer':
       phase = { name: 'courtesyOffer', offers: [null, null, null, null] };
       break;
-    case 'heavenly':
-      phase = { name: 'heavenly' };
-      break;
     case 'turn':
-      phase = { name: 'turn', seat: ph.seat, source: ph.source ?? 'draw', from: ph.from ?? null, exchanged: false, redeemed: [] };
+      phase = { name: 'turn', seat: ph.seat, source: ph.source ?? 'draw', from: ph.from ?? null, exchanged: false, redeemed: [], completedBy: null };
       break;
     case 'callWindow': {
       const last = floor[floor.length - 1];

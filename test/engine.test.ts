@@ -72,7 +72,6 @@ describe('deal', () => {
 describe('Charleston', () => {
   it('passes right, then across, then left', () => {
     let { state } = newGame({ seed: 'charleston-dirs', cardId: 'practice' });
-    if (state.phase.name === 'heavenly') state = act(state, 0, { type: 'proceed' }).state;
     for (const [pass, offset] of [
       [0, 1],
       [1, 2],
@@ -348,7 +347,7 @@ describe('jokers and exposures', () => {
 });
 
 describe('dead hands and game endings', () => {
-  it('declares a hand dead only on public evidence, then skips that player', () => {
+  it('declares a hand dead only on settled public evidence, then skips that player', () => {
     // seat 2's pung of 6 Bams and kong of 8 Bams fit only the 2468 line in Bams, which needs a pair of 2 Bams
     let s = scenario({
       phase: { name: 'turn', seat: 0 },
@@ -359,11 +358,16 @@ describe('dead hands and game endings', () => {
         { seat: 3, code: '2B' },
       ],
     });
-    const { state, events } = act(s, 0, { type: 'discard', tile: tilesFromHand(s, 0, '2B')[0] as TileId });
-    expect(state.players[2]?.dead?.code).toBe('noHandPossible');
-    expect(events.find((e) => e.type === 'dead')).toMatchObject({ seat: 2 });
-    expect(pendingSeats(state)).toEqual([1, 3]);
-    s = passAll(state, [1, 3]);
+    // the third 2 Bam is discarded: while it can still be claimed, it doesn't count against seat 2
+    const discarded = act(s, 0, { type: 'discard', tile: tilesFromHand(s, 0, '2B')[0] as TileId });
+    expect(discarded.state.players[2]?.dead).toBeNull();
+    expect(pendingSeats(discarded.state)).toEqual([1, 2, 3]);
+    // nobody claims it: now it is dead on the table, and seat 2 is declared dead before the next draw
+    s = passAll(discarded.state, [1, 2]);
+    const closed = act(s, 3, { type: 'pass' });
+    expect(closed.state.players[2]?.dead?.code).toBe('noHandPossible');
+    expect(closed.events.map((e) => e.type)).toEqual(['dead', 'draw']);
+    s = closed.state;
     expect(s.phase).toMatchObject({ name: 'turn', seat: 1 });
     s = act(s, 1, { type: 'discard', tile: threeTiles(s, 1)[0] as TileId }).state;
     expect(pendingSeats(s)).toEqual([3, 0]);
@@ -382,7 +386,14 @@ describe('dead hands and game endings', () => {
   });
 
   it('is a wall game when the wall runs out with no Mah Jongg', () => {
-    let s = scenario({ phase: { name: 'callWindow', discarder: 0 }, floor: [{ seat: 0, code: '9D' }], wallSize: 0 });
+    // An empty wall puts about 90 tiles on the table, which would make nearly every hand provably dead;
+    // dead-hand calls are switched off so this test is only about the wall running out.
+    let s = scenario({
+      rules: { autoDeclareDead: false },
+      phase: { name: 'callWindow', discarder: 0 },
+      floor: [{ seat: 0, code: '9D' }],
+      wallSize: 0,
+    });
     s = passAll(s, [1, 2, 3]);
     expect(result(s)).toEqual({ type: 'wall', payments: [0, 0, 0, 0] });
   });
@@ -439,17 +450,22 @@ describe('declaring Mah Jongg and payments', () => {
     expect(result(s).payments).toEqual([-100, 200, -50, -50]);
   });
 
-  it('a Heavenly Hand is declared at once and paid as a self-pick', () => {
-    const s = scenario({ phase: { name: 'heavenly' }, hands: { 0: 'F F 2B 2B 4B 4B 4B 6B 6B 6B 8B 8B 8B 8B' } });
+  it('a Heavenly Hand is declared at once, before the first pass, and paid as a self-pick', () => {
+    const s = scenario({ phase: { name: 'charleston', pass: 0 }, hands: { 0: 'F F 2B 2B 4B 4B 4B 6B 6B 6B 8B 8B 8B 8B' } });
+    // nothing reveals the complete hand to the others: everyone is choosing tiles for the first pass
+    expect(pendingSeats(s)).toEqual([0, 1, 2, 3]);
     const r = result(act(s, 0, { type: 'declareMahjong' }).state);
     expect(r).toMatchObject({ how: 'heavenly', selfPick: true, jokerless: true });
     expect(r.payments).toEqual([300, -100, -100, -100]);
   });
 
-  it('newGame detects a Heavenly Hand, and declining it starts the Charleston', () => {
-    const s = scenario({ phase: { name: 'heavenly' }, hands: { 0: 'F F 2B 2B 4B 4B 4B 6B 6B 6B 8B 8B 8B 8B' } });
-    expect(pendingSeats(s)).toEqual([0]);
-    expect(act(s, 0, { type: 'proceed' }).state.phase).toMatchObject({ name: 'charleston', pass: 0 });
+  it('only East may declare before the Charleston, and only before passing', () => {
+    const s = scenario({ phase: { name: 'charleston', pass: 0 }, hands: { 0: 'F F 2B 2B 4B 4B 4B 6B 6B 6B 8B 8B 8B 8B' } });
+    refuse(s, 1, { type: 'declareMahjong' }, 'notYourTurn');
+    const later = scenario({ phase: { name: 'charleston', pass: 1 }, hands: { 0: 'F F 2B 2B 4B 4B 4B 6B 6B 6B 8B 8B 8B 8B' } });
+    refuse(later, 0, { type: 'declareMahjong' }, 'heavenlyTooLate');
+    const notComplete = scenario({ phase: { name: 'charleston', pass: 0 } });
+    refuse(notComplete, 0, { type: 'declareMahjong' }, 'notComplete');
   });
 
   it('East complete after the Charleston declares instead of discarding, paid as a self-pick (labeled choice a)', () => {
