@@ -290,33 +290,37 @@ export function App(props: AppProps) {
       <Messages state={state} session={session} blind={blind} />
       <CoachBar session={session} selected={selected} onPin={pin} />
       <MyExposures me={me} canChange={(tc?.amends.length ?? 0) > 0} onChange={() => setSheet('amend')} />
-      <Rack
-        hand={me.hand}
-        order={prefs.rackOrder}
-        selected={selected}
-        lastDrawn={session.lastDrawn}
-        names={prefs.tileNames}
-        dead={me.dead !== null}
-        fits={shownPin?.fits ?? null}
-        onTap={tapTile}
-        onOrder={(o) => updatePrefs({ ...prefs, rackOrder: o })}
-      >
-        {shownPin && <PinnedStrip session={session} index={Math.min(pinView, session.pins.length - 1)} onSwitch={() => setPinView((pinView + 1) % session.pins.length)} onUnpin={pin} />}
-      </Rack>
-      <section class="actions" aria-label="Your moves">
-        <Actions
-          state={state}
-          session={session}
-          pending={pending}
+      {/* your rack and your buttons stay together at the bottom, so the buttons never cover your tiles */}
+      <div class="dock">
+        <Rack
+          hand={me.hand}
+          order={prefs.rackOrder}
           selected={selected}
-          blind={blind}
-          tc={tc}
-          onBlind={setBlind}
-          onAct={act}
-          onOpen={setSheet}
-          w={w}
-        />
-      </section>
+          lastDrawn={session.lastDrawn}
+          names={prefs.tileNames}
+          dead={me.dead !== null}
+          fits={shownPin?.fits ?? null}
+          onTap={tapTile}
+          onOrder={(o) => updatePrefs({ ...prefs, rackOrder: o })}
+          onCard={() => setSheet('card')}
+        >
+          {shownPin && <PinnedStrip session={session} index={Math.min(pinView, session.pins.length - 1)} onSwitch={() => setPinView((pinView + 1) % session.pins.length)} onUnpin={pin} />}
+        </Rack>
+        <section class="actions" aria-label="Your moves">
+          <Actions
+            state={state}
+            session={session}
+            pending={pending}
+            selected={selected}
+            blind={blind}
+            tc={tc}
+            onBlind={setBlind}
+            onAct={act}
+            onOpen={setSheet}
+            w={w}
+          />
+        </section>
+      </div>
       {sheet === 'card' && (
         <Sheet title={card.name} onClose={() => setSheet(null)}>
           <CheatSheetPanel card={card} prefs={prefs} onPrefs={updatePrefs} pinning={session.coachOn ? { pins: session.pins, onToggle: pin, away } : undefined} />
@@ -652,6 +656,8 @@ function Rack(props: {
   fits: Set<TileId> | null;
   onTap: (t: TileId) => void;
   onOrder: (o: Prefs['rackOrder']) => void;
+  /** Open the card (cheat sheet) from right beside your tiles. */
+  onCard: () => void;
   children?: ComponentChildren;
 }) {
   const groups = rackGroups(props.hand, props.order);
@@ -659,14 +665,20 @@ function Rack(props: {
     <section class="rack-area" aria-label="Your rack">
       <div class="rack-head">
         <span class="rack-title">
-          Your rack <span class="muted">· {props.hand.length} tiles</span>
+          <span class="rack-word">Your rack · </span>
+          <span class="muted">{props.hand.length} tiles</span>
         </span>
-        <div class="seg" role="group" aria-label="Sort your rack">
-          <button class="seg-btn" aria-pressed={props.order === 'suit'} onClick={() => props.onOrder('suit')}>
-            By suit
-          </button>
-          <button class="seg-btn" aria-pressed={props.order === 'number'} onClick={() => props.onOrder('number')}>
-            By number
+        <div class="rack-tools">
+          <div class="seg" role="group" aria-label="Sort your rack">
+            <button class="seg-btn" aria-pressed={props.order === 'suit'} onClick={() => props.onOrder('suit')}>
+              By suit
+            </button>
+            <button class="seg-btn" aria-pressed={props.order === 'number'} onClick={() => props.onOrder('number')}>
+              By number
+            </button>
+          </div>
+          <button class="btn small rack-card" onClick={props.onCard}>
+            Card
           </button>
         </div>
       </div>

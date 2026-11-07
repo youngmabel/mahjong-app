@@ -1,7 +1,7 @@
 /**
  * Browser check of the built page (dist/mahjong-local.html, served from a local web server): plays whole
  * games by tapping the screen like a person would, at Mac and iPhone sizes (including iPhone screens with
- * the browser's toolbars showing), and saves screenshots along the way. After the free-play games it plays
+ * the browser's toolbars showing, and Claude's side panel on a Mac), and saves screenshots along the way. After the free-play games it plays
  * the three guided matches in a row (pinning a hand, dismissing rule cards, asking for hints, one undo in
  * match 1), checks each readiness report, and checks that you graduate after match 3. It fails on any page
  * error, a page wider than the screen, a stuck game, a game that never ends, or a reload that doesn't
@@ -54,6 +54,8 @@ const SIZES = [
   { name: 'iphone-safari', viewport: { width: 390, height: 664 }, dpr: 3, touch: true },
   { name: 'iphone-se-safari', viewport: { width: 375, height: 548 }, dpr: 2, touch: true },
   { name: 'mac', viewport: { width: 1280, height: 800 }, dpr: 2, touch: false },
+  // the app inside Claude's side panel on a Mac (taller than wide, so it uses the upright layout)
+  { name: 'mac-claude-panel', viewport: { width: 720, height: 780 }, dpr: 2, touch: false },
 ];
 
 function rand(seed) {
@@ -91,12 +93,24 @@ async function settled(page, before) {
     .catch(() => {});
 }
 
+/**
+ * Tap, but give up after a few seconds instead of half a minute: a sheet can open just as a tap lands (the
+ * "Which hand are you going for?" question, or the results), and the next pass of the loop deals with it.
+ */
+async function tap(locator) {
+  try {
+    await locator.click({ timeout: 3000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function clickButton(page, text) {
   // (dimmed buttons stay tappable: they explain why the move isn't allowed)
   const b = page.locator('.actions .btn', { hasText: text }).first();
   if ((await b.count()) === 0) return false;
-  await b.click();
-  return true;
+  return tap(b);
 }
 
 async function openMenu(page) {
@@ -180,7 +194,7 @@ async function playOneGame(page, size, r, shots, gameIndex) {
       }
       await pickTiles(page, 3 - blind, r);
       await shot(page, `${tag}-charleston`, shots);
-      await page.locator('.actions .btn', { hasText: 'Pass' }).first().click();
+      await tap(page.locator('.actions .btn', { hasText: 'Pass' }).first());
       await settled(page, before);
       continue;
     }
@@ -191,7 +205,7 @@ async function playOneGame(page, size, r, shots, gameIndex) {
     }
     if (phase === 'courtesyOffer') {
       await shot(page, `${tag}-courtesy`, shots);
-      await page.locator('.seg.offer .seg-btn').nth(Math.floor(r() * 4)).click();
+      await tap(page.locator('.seg.offer .seg-btn').nth(Math.floor(r() * 4)));
       await settled(page, before);
       continue;
     }
@@ -199,7 +213,7 @@ async function playOneGame(page, size, r, shots, gameIndex) {
       const text = await page.locator('.actions').innerText();
       const n = Number(/Pass (\d) across/.exec(text)[1]);
       await pickTiles(page, n, r);
-      await page.locator('.actions .btn', { hasText: 'across' }).click();
+      await tap(page.locator('.actions .btn', { hasText: 'across' }));
       await settled(page, before);
       continue;
     }
@@ -231,7 +245,7 @@ async function playOneGame(page, size, r, shots, gameIndex) {
       if (!(await isLit())) {
         if (!shots.has(`${tag}-explain`)) {
           // tapping Discard with nothing chosen shows an explanation
-          await discard.click();
+          if (!(await tap(discard))) continue;
           await shot(page, `${tag}-explain`, shots);
         }
         await pickTiles(page, 1, r);
@@ -240,7 +254,7 @@ async function playOneGame(page, size, r, shots, gameIndex) {
           .catch(() => {});
       }
       await shot(page, `${tag}-turn`, shots);
-      await discard.click();
+      await tap(discard);
       await settled(page, before);
       continue;
     }
@@ -254,7 +268,7 @@ async function playOneGame(page, size, r, shots, gameIndex) {
       }
       const calls = page.locator('.actions .btn:not(.is-dim)', { hasText: /Pung|Kong|Quint|Sextet/ });
       if ((await calls.count()) && r() < 0.6) {
-        await calls.first().click();
+        await tap(calls.first());
         await settled(page, before);
         continue;
       }
