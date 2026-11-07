@@ -43,7 +43,12 @@ Last updated: November 6, 2026 (build chat 3, milestone 3 complete).
   - **A stand-in that only follows the coach** played 24 free-play games against level 2 computer players: the referee accepted all 928 suggested moves, every suggestion and hint was one or two sentences, and it won 8 of 24 (about 22% is par against three equal players).
   - **Set judgment:** on 40 random racks the coach's Charleston pass was the best of every possible 3-tile set (checked by brute force), never worse than picking one tile at a time.
   - **Guided matches with the stand-in:** match 1, 8 games: 4 wins, 4 wall games, 0 computer wins (the practice setting works). Matches 2 and 3, 12 games: the computer players won 9.
-- **Browser check:** the final run at all six sizes is in progress; this line is updated when it finishes.
+- **Browser check** (scripts/ui-check.cjs), at six sizes: iPhone upright, on its side, and the small iPhone SE; an iPhone and an SE with Safari's toolbars showing; and a Mac window.
+  - **What it did at each size:** one free-play game, then guided matches 1, 2 and 3, all played by tapping the screen. Along the way it pinned a hand, dismissed rule cards, asked for hints and used undo once.
+  - **What it checked:** a readiness report after each match, graduation after match 3, the cheat sheet and settings, and a reload that resumed the game and kept graduation. There were no page errors and no sideways scrolling at any size.
+  - **Results:** the random tapper doesn't play to win, so match 1 ended in a wall game every time, and computer players won matches 2 and 3.
+  - **Timing fix:** two fixes went into the check script itself: a button lookup that matched two buttons, and taps that could land just as the results sheet opened.
+  - **Caveat:** it runs on Chrome's engine, so Safari and the Claude iPhone app haven't been tested directly yet.
 - **Bug found and fixed by the browser check:** the "Which hand are you going for?" list crashed, which froze the screen at your first turn when nothing was pinned (a variable named `h` hid the screen library's own `h`). A test now checks the screen code for that mistake.
 - **Engine:** unchanged in milestone 3; no rule changes or bug fixes were needed.
 
@@ -233,7 +238,7 @@ The NMJL rulebook *Mah Jongg Made Easy* would settle most of these.
 - Undo (match 1) remembers your moves only while the page is open; a reload clears it.
 - Playful and Classic tiles, the magnifier, sound and rearranging tiles by hand come later (step 7 and beyond).
 - The IOU blind-pass method follows Tom Sloper's description; the NMJL's 2020 rule text wasn't found.
-- Screens were checked with Chrome's engine at iPhone and Mac sizes, not yet on a real iPhone or in Safari.
+- Screens were checked with Chrome's engine at iPhone and Mac sizes, not yet on a real iPhone or in Safari. On an upright iPhone, match 1 scrolls a little (everyone's tiles are face up; Settings can hide them).
 
 ## What's next
 

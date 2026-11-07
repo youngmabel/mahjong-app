@@ -116,27 +116,27 @@ async function coachSteps(page, tag, r, shots, flags) {
   const got = page.locator('.coach .btn', { hasText: 'Got it' });
   if ((await got.count()) && r() < 0.85) {
     await shot(page, `${tag}-rule-card`, shots);
-    await got.first().click();
+    await got.first().click({ timeout: 3000 }).catch(() => {}); // the results sheet can open over it as the game ends
     return true;
   }
   const pins = page.locator('.coach-pins .btn');
   if (await pins.count()) {
     await shot(page, `${tag}-coach-pins`, shots);
-    await pins.first().click();
-    await page.waitForSelector('.pinned', { timeout: 2000 });
+    await pins.first().click({ timeout: 3000 }).catch(() => {});
+    await page.waitForSelector('.pinned', { timeout: 2000 }).catch(() => {});
     await shot(page, `${tag}-pinned`, shots);
     return true;
   }
   const hint = page.locator('.coach .btn:not([disabled])', { hasText: /^(Hint|More help)/ });
   if ((await hint.count()) && r() < 0.12) {
-    await hint.first().click();
+    await hint.first().click({ timeout: 3000 }).catch(() => {});
     await shot(page, `${tag}-hint`, shots);
     return true;
   }
   const undo = page.locator('.coach .btn', { hasText: 'Undo' });
   if ((await undo.count()) && !flags.undone) {
     flags.undone = true;
-    await undo.click();
+    await undo.click({ timeout: 3000 }).catch(() => {});
     await shot(page, `${tag}-undo`, shots);
     return true;
   }
