@@ -6,7 +6,7 @@
 import { expect } from 'vitest';
 import { callOptions, checkInvariants } from '../src/engine/engine';
 import { seatView } from '../src/engine/view';
-import { coachNote, type CoachOptions } from '../src/coach';
+import { coachNote, rankLines, readRack, type CoachOptions } from '../src/coach';
 import {
   callChoices,
   charlestonPassChoice,
@@ -47,6 +47,37 @@ export function coachFollowerMove(session: Session, opts: CoachOptions, texts: s
   const view = seatView(state, HUMAN);
   const legalCalls = state.phase.name === 'callWindow' ? callOptions(state, HUMAN) : undefined;
   const note = coachNote(view, opts, legalCalls ? { legalCalls } : {});
+  if (!note || !note.choiceKey) throw new Error(`the coach had nothing to suggest in phase ${state.phase.name}`);
+  texts.push(note.text, ...(note.why ? [note.why] : []), ...(note.extra ? [note.extra] : []), ...note.tiers);
+  const choice = choiceForNote(session, note.choiceKey, note.tiles, note.blind);
+  if (!choice) throw new Error(`the coach suggested "${note.choiceKey}", which the screen doesn't offer`);
+  if (!choice.ok) throw new Error(`the coach suggested "${note.text}", which the referee refuses: ${choice.reason}`);
+  const reason = session.act(choice.action);
+  if (reason) throw new Error(`the coach's move was refused: ${reason}`);
+  expect(checkInvariants(session.state)).toEqual([]);
+  return true;
+}
+
+/**
+ * A stand-in for a learner in a guided match: pins the coach's closest line at the first Charleston pass
+ * (or when asked for a direction), then follows the session's own coach note.
+ */
+export function guidedFollowerMove(session: Session, texts: string[], opts: { pin?: boolean } = {}): boolean {
+  const state = session.state;
+  if (session.needsDirection) {
+    if (opts.pin === false) session.dismissDirection();
+    else {
+      const top = rankLines(readRack(seatView(state, HUMAN)), session.coachOptions()).find((l) => !l.blocked);
+      if (top) session.pin(top.handId);
+      else session.dismissDirection();
+    }
+  }
+  if (!isPending(state, HUMAN)) return false;
+  if (opts.pin !== false && session.pins.length === 0 && state.phase.name === 'charleston') {
+    const top = rankLines(readRack(seatView(state, HUMAN)), session.coachOptions()).find((l) => !l.blocked);
+    if (top) session.pin(top.handId);
+  }
+  const note = session.note();
   if (!note || !note.choiceKey) throw new Error(`the coach had nothing to suggest in phase ${state.phase.name}`);
   texts.push(note.text, ...(note.why ? [note.why] : []), ...(note.extra ? [note.extra] : []), ...note.tiers);
   const choice = choiceForNote(session, note.choiceKey, note.tiles, note.blind);

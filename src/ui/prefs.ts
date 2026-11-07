@@ -19,11 +19,17 @@ export interface Prefs {
   /** Show each tile's name under the tiles on your rack. */
   tileNames: boolean;
   rackOrder: RackOrder;
-  /** Leave concealed (C) hands off the cheat sheet (and, later, out of the coach's suggestions). */
+  /** Leave concealed (C) hands off the cheat sheet and out of the coach's suggestions. */
   hideConcealed: boolean;
   tileStyle: TileStyle;
-  /** Progress that unlocks rewards. Set by the tutorial and graduation (later milestones). */
+  /** Progress that unlocks rewards. Set by the tutorial (step 6) and by graduating from the guided matches. */
   progress: { tutorialDone: boolean; graduated: boolean };
+  /** Coach hints (the Hint button, rule cards, pinning a hand) in free play. Off by default. */
+  coachInFreePlay: boolean;
+  /** Show the other players' tiles face up in guided match 1 (the open table). */
+  openRacks: boolean;
+  /** Where the app opens: your free-play game or your guided match. */
+  lastMode: 'free' | 'guided';
 }
 
 export const DEFAULT_PREFS: Prefs = {
@@ -36,6 +42,9 @@ export const DEFAULT_PREFS: Prefs = {
   hideConcealed: false,
   tileStyle: 'clean',
   progress: { tutorialDone: false, graduated: false },
+  coachInFreePlay: false,
+  openRacks: true,
+  lastMode: 'free',
 };
 
 /** Milliseconds a computer player's move stays on screen before the next one. */
@@ -70,6 +79,9 @@ export function readPrefs(raw: unknown): Prefs {
   if (typeof r.tileNames === 'boolean') p.tileNames = r.tileNames;
   if (r.rackOrder === 'suit' || r.rackOrder === 'number') p.rackOrder = r.rackOrder;
   if (typeof r.hideConcealed === 'boolean') p.hideConcealed = r.hideConcealed;
+  if (typeof r.coachInFreePlay === 'boolean') p.coachInFreePlay = r.coachInFreePlay;
+  if (typeof r.openRacks === 'boolean') p.openRacks = r.openRacks;
+  if (r.lastMode === 'free' || r.lastMode === 'guided') p.lastMode = r.lastMode;
   const prog = r.progress as Record<string, unknown> | undefined;
   if (prog && typeof prog === 'object') {
     if (typeof prog.tutorialDone === 'boolean') p.progress.tutorialDone = prog.tutorialDone;

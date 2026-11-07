@@ -23,6 +23,8 @@ export interface Choice {
   ok: boolean;
   /** The referee's one- or two-sentence reason when it doesn't. */
   reason: string | null;
+  /** The referee's code for that reason (for counting rule slips in the guided matches). */
+  code?: string;
   /** Tiles to picture on the button (an exposure preview). */
   tiles?: TileId[];
   /** True when the screen itself refuses (for example nothing selected yet); the move never reaches the referee. */
@@ -52,8 +54,8 @@ export function dryRun(state: GameState, seat: number, action: Action): string |
 }
 
 function choice(state: GameState, seat: number, key: string, label: string, action: Action, extra: Partial<Choice> = {}): Choice {
-  const reason = dryRun(state, seat, action);
-  return { key, label, action, ok: reason === null, reason, ...extra };
+  const r = apply(state, seat, action);
+  return r.ok ? { key, label, action, ok: true, reason: null, ...extra } : { key, label, action, ok: false, reason: r.violation.message, code: r.violation.code, ...extra };
 }
 
 /** A choice the screen itself refuses (for example nothing selected), with a plain reason. */
