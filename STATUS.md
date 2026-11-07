@@ -1,11 +1,12 @@
 # STATUS: Mah Jongg Practice App
 
-Last updated: October 28, 2026 (build chat 2, milestone 2 complete).
+Last updated: November 6, 2026 (build chat 3, milestone 3 complete).
 
 ## Play it
 
 - **The app:** https://claude.ai/artifact/Gytq4hufBNLTVDJBMxLtwX (a private Claude artifact named "Mah Jongg Practice"). It opens on your Mac or iPhone wherever you're signed in to Claude.
-- **Saving:** your game, scores and settings save to the artifact's private per-person storage, so you can stop anytime and pick up on the other device. Only you can read it.
+- **Guided practice:** tap **Menu**, then **Match 1: open table**. Match 2 opens when match 1 is finished, and match 3 after match 2.
+- **Saving:** your free-play game, your guided match, your settings and your progress each save to the artifact's private per-person storage, so you can stop anytime and pick up on the other device. Only you can read them. Your free-play game from milestone 2 carries over.
 - **The card:** games use the invented practice card until the real 2026 card is entered.
 
 ## Where things live
@@ -15,7 +16,38 @@ Last updated: October 28, 2026 (build chat 2, milestone 2 complete).
 - **Research notes:** MAHJONG/*.md and MAHJONG/research/, also copied into the repository's docs/ folder so the repository stands on its own.
 - **Tile art:** the 3D tile set is in "Claude Outputs (Local)/26-10-28 Mahjong 3D Tiles" on your Mac (full-size images, the Blender file and scripts). The repository keeps the parts the app uses in assets/tiles/clean/: the flat face drawings (faces-svg), the small WebP images (images-app), tiles.json and the scripts.
 
-## Done: milestone 2 (build order step 4, a playable screen)
+## Done: milestone 3 (build order step 5, the coach and guided matches)
+
+1. **The coach** (src/coach/). It sees only your own view of the table, like the computer players, and uses the same hand-checking code.
+   - **Your closest hands:** every card line, ranked by tiles away (counting only tiles still available), then by missing singles and pairs (jokers can't fill those), then by how many live tiles would help. A line you can no longer finish is skipped.
+   - **Charleston:** suggests 3 tiles judged together as a set (never a joker, never a tile your pinned hand needs when others will do), says why, and suggests a blind pass on the first left or last right when fewer than 3 tiles are easy to give up.
+   - **Your turn:** suggests a discard and why, never one your pinned hand needs when another tile will do; warns before you feed a player with 2 or 3 exposures; plays safe late in a hopeless hand; points out joker exchanges and Mah Jongg.
+   - **After a discard:** weighs every legal call (each size and joker count), and says whether calling is wise, not just legal.
+   - **Stop vote and courtesy pass:** advice without naming tiles.
+   - **Wording:** rules as facts, hand advice as suggestions. "Hide concealed hands" keeps concealed lines out of all of it.
+2. **Pinning a hand.** Pin up to two lines (from the coach in match 1, the Card sheet, or the "Which hand are you going for?" list when play begins). The pinned line is drawn just above your rack: tiles you hold, then the ones still needed, faded. Rack tiles the line uses get a gold underline. The rack itself keeps its fixed order.
+3. **Rule cards.** Sixteen short rule cards (the goal, the Charleston, blind passes, the stop vote, the courtesy pass, East starting, a turn, calling, after a call, concealed hands, jokers, joker exchange, discarded jokers, dead hands, who pays, wall games, and "Safety is off" for match 3), each shown the first time its situation comes up and remembered after "Got it." A move the referee stops twice for the same rule brings that card back.
+4. **Hints.** A Hint button reveals four tiers: a nudge, the section your tiles point to, the specific line and what it still needs, then the coach's answer (for passes and discards, only after you've picked a tile of your own).
+5. **Guided matches** (Menu). One game each, with help that fades:
+   - **Match 1, open table:** everyone's tiles face up (a setting can hide them on a small screen), the computer players explain each move in a sentence, the coach offers your 3 closest hands to pin, suggests every move and comments on what you select. The coach makes your first Charleston pass with you, picks 2 of the 3 tiles on the second, then you take over. Undo is on, Safety is on, and the gentle computer players never declare Mah Jongg (shown on screen as a practice setting). The deal starts within 7 tiles of a Consecutive Run line that is the closest line on the card.
+   - **Match 2, concealed table:** racks hidden, computer players who can win, hints only on request, rule explanations right away, and strategy notes saved for the review. Safety is on.
+   - **Match 3, dress rehearsal:** Safety off (as at a real table), 6 hint taps for the game, stronger computer players, and the full review.
+6. **After each match:** a readiness report (Rules, Choosing a hand, Card reading, and Pace as advice only) and the coach's review: how many of your decisions matched the coach's, and up to four of the costliest differences with a one-line lesson.
+7. **Graduation:** after match 3, or offered early when every check passes after match 2. It unlocks Classic tiles (drawn in step 7), and every match stays open to replay.
+8. **Free play** is unchanged and always open. New setting: "Coach hints in free play" (off by default) adds the Hint button, rule cards and pinning. Until you start match 1, free play shows a one-line pointer to guided practice.
+9. **Screen changes:** the top bar now has Card and Menu; the Table log and Settings moved into the Menu. Settings shows Safety as set by the match during a guided match, and "New session" becomes "Restart this match."
+
+## Milestone 3 results
+
+- **Automatic tests:** 182 passing: the 146 from milestones 1 and 2 plus 36 new (21 coach, 14 guided-match and settings, 1 screen-code guard).
+  - **A stand-in that only follows the coach** played 24 free-play games against level 2 computer players: the referee accepted all 928 suggested moves, every suggestion and hint was one or two sentences, and it won 8 of 24 (about 22% is par against three equal players).
+  - **Set judgment:** on 40 random racks the coach's Charleston pass was the best of every possible 3-tile set (checked by brute force), never worse than picking one tile at a time.
+  - **Guided matches with the stand-in:** match 1, 8 games: 4 wins, 4 wall games, 0 computer wins (the practice setting works). Matches 2 and 3, 12 games: the computer players won 9.
+- **Browser check:** the final run at all six sizes is in progress; this line is updated when it finishes.
+- **Bug found and fixed by the browser check:** the "Which hand are you going for?" list crashed, which froze the screen at your first turn when nothing was pinned (a variable named `h` hid the screen library's own `h`). A test now checks the screen code for that mistake.
+- **Engine:** unchanged in milestone 3; no rule changes or bug fixes were needed.
+
+## Done earlier: milestone 2 (build order step 4, a playable screen)
 
 1. **The table.**
    - **Top bar:** game number, your wind (and Dealer), tiles left in the wall, your score, and Card, Log and Settings buttons.
@@ -60,7 +92,7 @@ Last updated: October 28, 2026 (build chat 2, milestone 2 complete).
     - **Very short screens** (an iPhone SE with Safari's toolbars showing, for example): the page scrolls a little, and the buttons stay pinned to the bottom.
 11. **Tile art: Clean.** The faces come from the 3D tile set's flat drawings, so the 2D and 3D tiles match. The 3D images are kept for the hold-to-magnify view later.
 
-## Milestone 2 results
+### Milestone 2 results
 
 - **Automatic tests:** 146 passing. That is the 126 engine tests plus 20 new screen tests.
   - **Stand-in player:** a stand-in for you that can only use the moves the screen offers plays whole games: 40 with Safety off, plus a 25-game session with Safety on.
@@ -126,7 +158,26 @@ A separate reviewer checked the engine against docs/01-rules.md and confirmed ea
 
 ## Decisions made
 
-### Milestone 2 (this chat)
+### Milestone 3 (this chat)
+
+- **One guided match is one game** (you approved Claude's recommendation), so the program is three games.
+- **Free play stays open** the whole time, as it was (you: "We can keep it open as it is now").
+- **Graduation** (you approved Claude's recommendation): always after match 3; after match 2, offered early when every check passes. Match 1 gives too much help to show readiness, so it never leads to early graduation (the teaching plan allowed any match).
+- **Card-reading check** (you: "That's fine"): shown as "comes with the tutorial" and not counted until the tutorial's questions exist (step 6).
+- **Pausing after discards in guided matches** (you: "just do what makes sense"; Claude's call): play stops for you only when you have a legal call, as in free play, and the coach explains the choice. "Stop after every discard" still works. The spec's stop-every-time rule would add about 50 stops a game.
+- **Technical calls (Claude):**
+  - **Computer players:** match 1 has three level 1 players who never declare Mah Jongg; match 2 has three level 2 players; match 3 has two level 2 players and one level 3 player across from you.
+  - **Match 1's deal** starts within 7 tiles of a Consecutive Run line that is also the closest line on the card. Typical practice-card deals start 9 or 10 tiles away (2,000 test deals).
+  - **Match 3 hint budget:** 6 taps.
+  - **Readiness checks:**
+    - **Rules:** no move the referee stopped for a real rule (passing a joker, calling a discard for a pair, and so on) and no dead hand. Safety blocks and taps with nothing chosen don't count.
+    - **Choosing a hand:** the hand pinned when play began can still be finished and is within 2 tiles of the closest.
+    - **Pace:** advice only.
+  - **Saving:** separate saves for free play, the guided match, settings and progress, so switching never loses a game.
+  - **Top bar:** Card and Menu.
+  - **The coach** lives in src/coach/, beside the bots and apart from the engine, and the engine's rules didn't change.
+
+### Milestone 2
 
 - **Rack order (you):** a fixed order, not based on any hand, plus a sort by number. Sorting by a target hand would give hints, which is the coach's job.
 - **Discards (you):** "organized by suit and sets, with the newest one highlighted and named". Who threw each copy shows on tap.
@@ -167,42 +218,46 @@ The NMJL rulebook *Mah Jongg Made Easy* would settle most of these.
 
 ## Open questions for you or the rulebook
 
-- **[L] With Safety off, an exposure that fits no hand.** The hand goes dead when the player discards. Right now the exposure stays on the rack and its jokers can still be taken. docs/01-rules.md section 7 says that for an "erroneous exposure" the tiles go back to the rack and those jokers can't be taken. The notes don't say whether a legal pung that fits no hand counts as "erroneous." This only arises with Safety off, which is now the free-play default, so it can come up in the app.
+- **[L] With Safety off, an exposure that fits no hand.** The hand goes dead when the player discards. Right now the exposure stays on the rack and its jokers can still be taken. docs/01-rules.md section 7 says that for an "erroneous exposure" the tiles go back to the rack and those jokers can't be taken. The notes don't say whether a legal pung that fits no hand counts as "erroneous." This arises only with Safety off: free play by default, and now match 3.
 - **Dead-hand calls never guess.** The referee counts every joker not yet discarded as still obtainable, so it may miss a few provable deaths, but it never declares a hand dead that could still win.
 - **On a nearly empty wall, everyone can be declared dead.** Late in a game, if the table shows that no hand on the card can still be made, players with no exposures can be declared dead too. The game then ends as "three dead" rather than as a wall game. Nobody pays either way.
-- **Your iPhone.** Please play a game or two on your iPhone (in the Claude app, and in Safari if you like) and tell the next chat anything that looks off: tile sizes, buttons hidden behind toolbars, turning the phone sideways, or saving between devices.
+- **Your iPhone and Mac.** Please play the guided matches on your iPhone (in the Claude app, and in Safari if you like) and on your Mac, and tell the next chat anything that looks off or reads wrong. Known: on an upright iPhone, match 1 scrolls a little because everyone's tiles are face up (Settings can hide them).
+- **Is match 1 too hard to finish?** On the practice card, a stand-in following the coach won half its match 1 games; the rest ran out of wall (the computer players never win match 1). If you'd like more wins there, the deal can start closer to a hand.
 
 ## Known limitations
 
 - The real 2026 card isn't entered yet (waiting for your card photos).
-- No coach, tutorial or guided matches yet (build steps 5 and 6). Playful and Classic tiles, the magnifier, sound and rearranging tiles by hand come later (step 7 and beyond).
-- Bot tuning: level 2 bots expose often (about 5 exposures per game) and win 94% of practice games. They need retuning against the real card. Levels 1 and 3 are placeholders.
+- No tutorial yet (build step 6). Until it exists, the readiness report's card-reading check shows "comes with the tutorial" and isn't counted, and rule cards have no "why" link to a lesson.
+- Levels 1 and 3 of the computer players are starting settings, not tuned (build step 9). They are used in match 1 (level 1) and match 3 (one level 3 player, across from you). Level 2 bots expose often and win 94% of practice games; all need retuning against the real card.
+- The coach's weights and the readiness thresholds are starting values to tune [M]: a hand is "viable" when it can still be finished and is within 2 tiles of the closest; Pace is the typical Charleston decision, 15 seconds or less.
+- Undo (match 1) remembers your moves only while the page is open; a reload clears it.
+- Playful and Classic tiles, the magnifier, sound and rearranging tiles by hand come later (step 7 and beyond).
 - The IOU blind-pass method follows Tom Sloper's description; the NMJL's 2020 rule text wasn't found.
-- Screens were checked with Chrome's engine at iPhone and Mac sizes, not yet on a real iPhone.
-- Starting a New session (in Settings) replaces the saved game; there is one saved game at a time.
+- Screens were checked with Chrome's engine at iPhone and Mac sizes, not yet on a real iPhone or in Safari.
 
 ## What's next
 
-- **Milestone 3:** build order step 5, the coach and the guided-match mode (docs/07-app-spec.md section 8, docs/05-teaching-plan.md sections 5 to 7). The Hide concealed hands setting should also apply to the coach's suggestions.
-- **Then:** step 6 (the tutorial engine and lessons) and step 7 (tile art polish: the Playful and Classic sets, which unlock on finishing the tutorial and on graduating, plus the magnifier).
+- **Milestone 4: build order step 6, the tutorial engine and lessons** (docs/05-teaching-plan.md section 3, docs/07-app-spec.md section 9): 5 rounds, 14 scenarios, each lesson a data file played on a rigged table, with recall questions that feed the readiness report's card-reading check. Finishing it unlocks Playful tiles.
+- **Then:** step 7 (tile art polish: the Playful and Classic sets, plus the magnifier) and step 9 (level 1 and 3 computer players, stats, export).
 - **When your card photos arrive:** step 8, entering and checking the 2026 card (docs/03-card-2026.md section 7).
 
 ## For the next build chat (technical notes)
 
+- **The coach (src/coach/):**
+  - lines.ts reads a rack from one seat's view: each line's closest version, tiles away, outs, blocked lines, pinned lines.
+  - advice.ts has the suggestions (passes, discards, calls, joker exchanges, the vote and courtesy pass), using the bots' own evaluation (src/bots/evaluate.ts) with a coach setting.
+  - note.ts turns them into one note per decision, with the four hint tiers and the screen button it points to. narrate.ts explains computer moves; rulecards.ts holds the rule cards; review.ts the review and readiness report.
 - **Screen code (src/ui/):**
-  - session.ts is the game driver: paced computer moves, your moves through the referee, the message log, and saving.
-  - moves.ts holds the button lists, each decided by a dry run with the referee.
-  - layout.ts arranges the rack, chart and cheat sheet. prefs.ts holds the settings and storage.ts the saving.
-  - The view/ folder has the screens. tiles/ has the Clean sprite, and clean-faces.ts is generated: don't edit it by hand.
+  - session.ts runs free play or a guided match: modeSettings, botsFor, match1Deal, undo, hints, rule cards, the decision log, the direction check and matchResult.
+  - progress.ts holds matches finished, reports, rule cards seen and graduation. view/Coach.tsx has the coach bar, pinned strip, menu, direction picker and report.
+  - Saves live at data/users/<your id>/game (free play), /guided, /prefs and /progress.
+- **Tests:** test/coach.test.ts and test/guided.test.ts; test/coachstandin.ts has stand-ins that follow the coach through the screen's own buttons.
 - **Commands:**
-  - `npm run build` writes dist/mahjong.html (the artifact page) and dist/mahjong-local.html (a full page for local testing).
-  - `npm run import-tiles` rebuilds src/ui/tiles/clean-faces.ts from assets/tiles/clean.
-  - `node scripts/ui-check.cjs <folder> <games-per-size>` runs the browser check. It needs Playwright with Chromium, which Claude's build environment has.
-- **Publishing:**
-  - Publish dist/mahjong.html with the Artifact tool, passing the artifact's URL (above) so it updates in place.
-  - Capabilities are db and user. Leave capabilities out on an update to keep them.
-  - Saves live at data/users/<your id>/game and data/users/<your id>/prefs.
-- **Git:** commit 489eadf on milestone-2 was recorded under the name "youngmabel" by mistake. Rewriting published history was refused as destructive, so it stays. Later commits use Claude's own name.
+  - `npm run build` (add MINIFY=0 for readable code when debugging a page error).
+  - `node scripts/ui-check.cjs <folder> <games-per-size>` now also plays guided matches 1 to 3 at each size and checks graduation. It takes about 15 to 25 minutes per size, so run sizes in parallel with SIZES=<one size> each; GUIDED=0 skips the guided matches.
+- **Screen code rule:** never name a variable `h` in a .tsx file; it hides the screen library's `h()` inside JSX. A test checks.
+- **Publishing:** publish dist/mahjong.html with the Artifact tool, passing the artifact's URL (above) so it updates in place. Capabilities are db and user; leave capabilities out on an update to keep them.
+- **Git:** milestone 3 was built on branch milestone-3 and merged into main. Commit 489eadf on milestone-2 was recorded under the name "youngmabel" by mistake; rewriting published history was refused as destructive, so it stays.
 
 ## How to run (on a Mac with Node.js 22 or later)
 
@@ -214,38 +269,39 @@ In the app folder, run `npm install` once. Then `npm test`, `npm run build` (the
 Continuing work from earlier chats on my mah jongg practice app. Before anything else, read every file listed below directly; do not rely on this summary for what is in them. If a file and this summary disagree, trust the file and tell me.
 
 THE PROJECT
-I'm building a personal app (never commercial) for learning and practicing American mah jongg (National Mah Jongg League rules) solo against three computer opponents, using the 2026 NMJL card and a 152-tile set with no blanks. Milestone 1 (the rules engine, the card compiler with an invented practice card, level 2 computer opponents) and milestone 2 (a playable screen, published as a private Claude artifact that saves my progress) are done, with 146 passing tests. Your job in this chat is milestone 3: build order step 5, the coach and the guided-match mode.
+I'm building a personal app (never commercial) for learning and practicing American mah jongg (National Mah Jongg League rules) solo against three computer opponents, using the 2026 NMJL card and a 152-tile set with no blanks. Done so far: milestone 1 (the rules engine, the card compiler with an invented practice card, level 2 computer opponents), milestone 2 (a playable screen, published as a private Claude artifact that saves my progress) and milestone 3 (the coach and three guided matches with graduation), with 182 passing tests. Your job in this chat is milestone 4: build order step 6, the tutorial engine and its lessons.
 
 READ FIRST
 1. STATUS.md in my private GitHub repository youngmabel/mahjong-app, branch main (attach the repository with push access and clone it; it is the master copy of the code). The same STATUS.md is in my MAHJONG folder (/Users/youngmabel/Documents/MAHJONG). It has what's done, every decision and who made it, the open questions, and technical notes for you.
-2. In the repository's docs/ folder: 07-app-spec.md (sections 8, 10 and 12), 05-teaching-plan.md (sections 5, 6 and 7: guided matches, graduation, hints), 04-strategy.md, 08-design-ideas.md, and 01-rules.md as needed.
-3. The screen code in src/ui/ (session.ts, moves.ts, layout.ts, prefs.ts, view/App.tsx, view/Sheets.tsx) and the engine's public pieces (src/engine/engine.ts, matcher.ts, view.ts, describe.ts, and src/bots/).
-4. The published app: https://claude.ai/artifact/Gytq4hufBNLTVDJBMxLtwX. Read it with the Artifact tool, and update it in place by passing this link when you publish, so my saved game and settings carry over.
+2. In the repository's docs/ folder: 05-teaching-plan.md (sections 2, 3, 4, 7 and 8: the lessons, the beginner mistakes, hints and the content guardrails), 07-app-spec.md (section 9, the tutorial scenario format, and section 13, the practice card), 02-tiles-and-terms.md (tile names and the "why it's called that" notes), 08-design-ideas.md, and 01-rules.md as needed.
+3. The code: src/engine/scenario.ts (rigged tables), src/coach/ (the coach: lines.ts, advice.ts, note.ts, rulecards.ts, review.ts), src/ui/session.ts, src/ui/progress.ts, src/ui/prefs.ts, src/ui/view/App.tsx, view/Coach.tsx and view/Sheets.tsx.
+4. The published app: https://claude.ai/artifact/Gytq4hufBNLTVDJBMxLtwX. Read it with the Artifact tool, and update it in place by passing this link when you publish, so my saved games, settings and progress carry over.
 
 DECISIONS ALREADY MADE (details and reasons in STATUS.md)
 - Standard NMJL rules, no house rules, no blank tiles. Our own tile art and our own card layout.
 - The app is a private Claude artifact with progress in its private per-person storage. The code lives in the GitHub repository; MAHJONG/app/ is a read-only mirror refreshed at the end of each chat.
-- Safety switch ON for the tutorial and guided matches 1 and 2, OFF for match 3 and (by default) free play. Scores in points. Sound off by default.
-- Nine labeled rule choices (a to i) are approved and listed in STATUS.md.
-- From milestone 2: my rack keeps a fixed order and is never sorted by a target hand (the coach should highlight tiles for a chosen hand instead). Discards sit in a fixed chart by suit. The "Hide concealed hands" option must also keep concealed hands out of the coach's suggestions ("a lot of new players are scared of pursuing concealed hands"). Tile sets: Clean now; Playful unlocks when I finish the tutorial, and Classic when I graduate to free play ("wins are not needed - just finishing the training program and graduate"). The settings already hold progress flags for this.
+- Safety switch ON for the tutorial and guided matches 1 and 2, OFF for match 3 and (by default) free play. Scores in points. Sound off by default. Nine labeled rule choices (a to i) are approved.
+- My rack keeps a fixed order and is never sorted by a target hand. "Hide concealed hands" also keeps concealed hands out of the coach ("a lot of new players are scared of pursuing concealed hands").
+- Tile sets: Clean now; Playful unlocks when I finish the tutorial, and Classic when I graduate ("wins are not needed - just finishing the training program and graduate"). The settings hold the progress flags.
+- From milestone 3: one guided match is one game; free play stays open the whole time; I graduate after match 3, or early after a clean match 2; the readiness report's card-reading check waits for the tutorial's questions and isn't counted until then.
 
 WHAT I WANT FROM YOU IN THIS CHAT
-1. Read the files. Ask me how the app worked on my iPhone and Mac, and fix anything I report first. Then give me a short plan for milestone 3: the coach (docs/07-app-spec.md section 8) and the guided-match mode with graduation (docs/05-teaching-plan.md sections 5 to 7). Ask me to decide anything open, with a recommendation for each.
-2. After I approve, build it without changing the engine's rules (bug fixes only, each with a test). Keep every existing test passing and add tests for the coach.
+1. Read the files. Ask me how the guided matches and the coach worked on my iPhone and Mac, and fix anything I report first. Then give me a short plan for milestone 4: the tutorial engine (lessons as data files on rigged tables, each checked automatically) and the 5 rounds of lessons in docs/05-teaching-plan.md section 3, including the recall questions that feed the card-reading check. Ask me to decide anything open, with a recommendation for each.
+2. After I approve, build it without changing the engine's rules (bug fixes only, each with a test). Keep every existing test passing and add tests for every lesson.
 3. Show me it works: update the published artifact in place, with all tests passing and the browser check run at iPhone and Mac sizes.
 4. Before the chat ends, update STATUS.md (in the repository and my MAHJONG folder), push to GitHub, refresh MAHJONG/app/, and give me a paste-ready prompt for the next chat.
 If I attach photos of my 2026 card, also enter it (build step 8, following docs/03-card-2026.md section 7 and docs/CARD-NOTATION.md) and show me the line-by-line check.
 
 GROUND RULES
 - I'm not an experienced programmer. Make the technical calls yourself and explain them in plain words.
-- Take rules from docs/01-rules.md (and the NMJL rulebook "Mah Jongg Made Easy" if I buy it). Don't invent rules. Where the notes mark something as medium or low confidence, flag it to me rather than guessing. Present rules as facts and the coach's hand advice as suggestions.
+- Take rules from docs/01-rules.md (and the NMJL rulebook "Mah Jongg Made Easy" if I buy it). Don't invent rules. Where the notes mark something as medium or low confidence, flag it to me rather than guessing. Present rules as facts and hand advice as suggestions. Check lesson text against the guardrails in docs/05-teaching-plan.md section 8.
 - The engine is the referee: prevent illegal moves and explain them in a sentence or two.
 
 SETUP IN THE NEW WORKSPACE
-- Clone the repository, run npm ci, then npm run check (146 tests should pass) and npm run build.
-- The browser check (node scripts/ui-check.cjs <folder> <games-per-size>) needs Playwright with Chromium, which Claude's build environment has.
+- Clone the repository, run npm ci, then npm run check (182 tests should pass) and npm run build.
+- The browser check (node scripts/ui-check.cjs <folder> <games-per-size>) needs Playwright with Chromium, which Claude's build environment has. It now plays the three guided matches at each size, so run the six sizes in parallel (SIZES=<one size> each); see the technical notes in STATUS.md.
 - Commit under Claude's default git identity.
 
 IF SOMETHING IS MISSING
-This continues the chat "Mah jongg app milestone 2" from October 28, 2026 (https://claude.ai/chat/4888da70-60d3-42ff-a376-b611a864b150). Search my past chats for "mah jongg milestone 2", "discard chart" or "Hide concealed hands" if you need the exact wording of something.
+This continues the chat "Mah jongg app milestone 3" from November 6, 2026 (Claude session https://claude.ai/code/session_01FMc1CGgrHruVE6jXFt2V7c). Search my past chats for "mah jongg milestone 3", "guided matches", "readiness report" or "coach bar" if you need the exact wording of something.
 ```
