@@ -33,8 +33,12 @@ You played match 1 in Claude on your Mac and reported: you "had to scroll up for
 
 ## Milestone 4 part 1 results
 
-- **Automatic tests:** RESULTS_TESTS
-- **Browser check:** RESULTS_BROWSER
+- **Automatic tests:** 198 passing: the 182 from milestones 1 to 3 plus 16 new (test/pip.test.ts): the glossary (every meaning one or two sentences, no clashing spellings, first-mention and whole-word linking), Pip's wording of real coach notes, the seat map's arrow for all six passes and the turn marker, a spotlight for every rule card, the tour, who lands on the start screen, and the content guardrails (no chows, no wind rounds, play to the right, jokers never in singles or pairs, NEWS as singles) over every new piece of text.
+- **Browser check** at seven sizes (iPhone upright, on its side, the small iPhone SE, an iPhone and an SE with Safari's toolbars, a Mac window, and Claude's Mac panel), all passing:
+  - **As a brand-new player:** the welcome screen and all nine tour steps, then the tour ticked off on the start screen.
+  - **Then:** a free-play game and guided matches 1 to 3, dismissing rule spotlights, pinning a hand from Pip's chips, tapping an underlined word, opening a face-up rack (match 1), hints, one undo, the readiness reports, graduation, and a reload that resumed the game and kept graduation. No page errors and no sideways scrolling.
+  - **Found and fixed by it:** on a phone held sideways, the spotlight's card ran past the bottom of the screen, so its button couldn't be tapped; the card now always fits on screen (below the bright spot, above it, or against the screen's edge).
+  - **Caveat:** it runs on Chrome's engine, so Safari and the Claude iPhone app haven't been tested directly.
 - **Published** in place (your saves, settings and progress carry over).
 - **Engine and coach logic:** unchanged. Pip is a presentation layer (src/ui/coachview.ts and src/ui/view/Pip.tsx) over the same coach notes, so everything the coach suggests is still checked by the milestone 3 tests.
 
