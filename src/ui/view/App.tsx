@@ -9,7 +9,7 @@ import { useEffect, useReducer, useRef, useState } from 'preact/hooks';
 import { getCard } from '../../engine/card';
 import { windOf } from '../../engine/engine';
 import type { GameState } from '../../engine/state';
-import { kindName, kindOfTile, sortTileIds, type TileId } from '../../engine/tiles';
+import { JOKER, kindName, kindOfTile, sortTileIds, type TileId } from '../../engine/tiles';
 import { seatView } from '../../engine/view';
 import { rankLines, readRack, type MatchNumber } from '../../coach';
 import { describeCell, discardChart, rackGroups } from '../layout';
@@ -33,13 +33,17 @@ import { graduate, matchUnlocked, recordMatch, type MatchOutcome, type Progress 
 import { FREE_PLAY, HUMAN, MATCH_LABELS, Session, sameMode, type Mode, type SavedGame, type SessionHost } from '../session';
 import type { Store } from '../storage';
 import { cleanSprite } from '../tiles/clean';
-import { CoachBar, DirectionPanel, MatchReport, MenuPanel, OpenRack, PinnedStrip, pinnedDisplay } from './Coach';
+import { DirectionPanel, MatchReport, MenuPanel, OpenRack, PinnedStrip, pinnedDisplay } from './Coach';
+import { CoachBubble, TermCard, TermContext, Words, pipButton, pipMarks } from './Pip';
+import { SeatMap, Spotlight } from './Spotlight';
+import { RULE_SPOTS, TOUR, TOUR_KEY, isNewPlayer, seatMap } from '../coachview';
+import type { Term } from '../glossary';
 import { ChoicesPanel, CheatSheetPanel, EndPanel, LogPanel, SettingsPanel, Sheet } from './Sheets';
 import { BackSvg, TileSvg, shortName } from './Tile';
 
 const SPRITE = cleanSprite();
 
-type SheetName = null | 'card' | 'settings' | 'log' | 'end' | 'exchange' | 'amend' | 'menu' | 'direction';
+type SheetName = null | 'card' | 'settings' | 'log' | 'end' | 'exchange' | 'amend' | 'menu' | 'direction' | 'openrack';
 type Player = GameState['players'][number];
 
 export interface AppProps {
@@ -70,7 +74,12 @@ export function App(props: AppProps) {
   const [, force] = useReducer((n: number) => n + 1, 0);
   const [prefs, setPrefs] = useState(props.prefs);
   const [progress, setProgress] = useState(props.progress);
-  const [sheet, setSheet] = useState<SheetName>(null);
+  // someone opening the app for the first time lands on the start screen (the Menu)
+  const [welcome, setWelcome] = useState(() => isNewPlayer(props.progress, props.saved, props.guided));
+  const [sheet, setSheet] = useState<SheetName>(() => (welcome ? 'menu' : null));
+  const [term, setTerm] = useState<Term | null>(null);
+  const [tour, setTour] = useState<number | null>(null);
+  const [openSeat, setOpenSeat] = useState(1);
   const [sel, setSel] = useState<{ key: string; tiles: TileId[]; blind: number }>({ key: '', tiles: [], blind: 0 });
   const [endShownFor, setEndShownFor] = useState('');
   const [pinView, setPinView] = useState(0);
@@ -199,6 +208,7 @@ export function App(props: AppProps) {
     setSel({ key: '', tiles: [], blind: 0 });
     setPinView(0);
     setSheet(null);
+    setWelcome(false);
     setMode(m);
   }
 
@@ -221,6 +231,23 @@ export function App(props: AppProps) {
     saveProgress(graduate(progressRef.current));
     unlockClassic();
     if (outcome) setOutcome({ ...outcome, o: { ...outcome.o, graduatedNow: true, mayGraduateEarly: false } });
+  }
+
+  function startTour() {
+    setSheet(null);
+    setWelcome(false);
+    setTour(0);
+  }
+
+  function nextTourStep() {
+    if (tour === null) return;
+    if (tour + 1 < TOUR.length) setTour(tour + 1);
+    else endTour();
+  }
+
+  function endTour() {
+    setTour(null);
+    session.dismissRule(TOUR_KEY);
   }
 
   function tapTile(t: TileId) {
@@ -280,18 +307,31 @@ export function App(props: AppProps) {
   const openRacks = settings.openRacks && prefs.openRacks;
   const away = settings.coach === 'proactive' ? new Map(rankLines(readRack(seatView(state, HUMAN)), { hideConcealed: prefs.hideConcealed }).map((l) => [l.handId, l.away])) : undefined;
   const match = session.match;
+  const marks = pipMarks(session);
+  const glow = pipButton(session);
+  const rule = sheet === null && tour === null ? session.ruleCard() : null;
+  const step = tour !== null ? TOUR[tour] : null;
+  const spot = rule ? RULE_SPOTS[rule.key] : null;
 
   return (
+    <TermContext.Provider value={setTerm}>
     <div class={`app${prefs.tileNames ? ' with-names' : ''}`} data-phase={p.name} data-mode={match ? `match-${match}` : 'free'} data-waiting-for-you={pending ? 'yes' : 'no'} data-step={`${state.gameNumber}:${state.actionCount}`}>
       <svg class="sprite" aria-hidden="true" dangerouslySetInnerHTML={{ __html: SPRITE }} />
       <TopBar state={state} label={match ? `Match ${match}` : null} onOpen={setSheet} />
-      <Opponents state={state} open={openRacks} />
+      <Opponents
+        state={state}
+        open={openRacks}
+        onOpenRack={(s) => {
+          setOpenSeat(s);
+          setSheet('openrack');
+        }}
+      />
       <Discards state={state} session={session} />
       <Messages state={state} session={session} blind={blind} />
-      <CoachBar session={session} selected={selected} onPin={pin} />
       <MyExposures me={me} canChange={(tc?.amends.length ?? 0) > 0} onChange={() => setSheet('amend')} />
       {/* your rack and your buttons stay together at the bottom, so the buttons never cover your tiles */}
       <div class="dock">
+        <CoachBubble session={session} selected={selected} onPin={pin} />
         <Rack
           hand={me.hand}
           order={prefs.rackOrder}
@@ -300,6 +340,7 @@ export function App(props: AppProps) {
           names={prefs.tileNames}
           dead={me.dead !== null}
           fits={shownPin?.fits ?? null}
+          marks={marks}
           onTap={tapTile}
           onOrder={(o) => updatePrefs({ ...prefs, rackOrder: o })}
           onCard={() => setSheet('card')}
@@ -318,6 +359,7 @@ export function App(props: AppProps) {
             onAct={act}
             onOpen={setSheet}
             w={w}
+            glow={glow}
           />
         </section>
       </div>
@@ -327,8 +369,16 @@ export function App(props: AppProps) {
         </Sheet>
       )}
       {sheet === 'menu' && (
-        <Sheet title="Menu" onClose={() => setSheet(null)}>
+        <Sheet
+          title={welcome ? 'Welcome!' : 'Menu'}
+          onClose={() => {
+            setSheet(null);
+            setWelcome(false);
+          }}
+        >
           <MenuPanel
+            welcome={welcome}
+            onTour={startTour}
             info={{ progress, mode, guidedInProgress: guidedInProgress(), freeGameNumber: (sessions.current.free?.state ?? saves.current.free?.state)?.gameNumber ?? null }}
             onMatch={pickMatch}
             onFree={() => switchTo(FREE_PLAY)}
@@ -415,6 +465,35 @@ export function App(props: AppProps) {
           />
         </Sheet>
       )}
+      {sheet === 'openrack' && (
+        <Sheet title={`${windOf(state, openSeat)}'s tiles (open table)`} onClose={() => setSheet(null)}>
+          <p class="help">In match 1 everyone plays face up, so you can see what each player is collecting.</p>
+          <div class="open-rack-big">
+            {sortTileIds((state.players[openSeat] as Player).hand).map((t) => (
+              <span class="named-tile" key={t}>
+                <TileSvg tile={t} cls="t-big" />
+                <small>{shortName(kindOfTile(t))}</small>
+              </span>
+            ))}
+          </div>
+        </Sheet>
+      )}
+      {step && (
+        <Spotlight
+          targets={step.targets}
+          lead=""
+          title={step.title}
+          text={step.text}
+          progress={`${(tour as number) + 1} of ${TOUR.length}`}
+          nextLabel={(tour as number) + 1 < TOUR.length ? 'Next' : 'Done'}
+          onNext={nextTourStep}
+          onSkip={(tour as number) + 1 < TOUR.length ? endTour : undefined}
+        />
+      )}
+      {rule && spot && (
+        <Spotlight targets={spot.targets} lead={spot.lead} title={rule.title} text={rule.text} nextLabel="Got it" onNext={() => session.dismissRule(rule.key)} />
+      )}
+      {term && <TermCard term={term} onClose={() => setTerm(null)} />}
       {sheet === 'amend' && tc && (
         <Sheet title="Change your exposure" onClose={() => setSheet(null)}>
           <ChoicesPanel
@@ -425,6 +504,7 @@ export function App(props: AppProps) {
         </Sheet>
       )}
     </div>
+    </TermContext.Provider>
   );
 }
 
@@ -502,7 +582,7 @@ function TopBar({ state, label, onOpen }: { state: GameState; label: string | nu
   );
 }
 
-function Opponents({ state, open }: { state: GameState; open: boolean }) {
+function Opponents({ state, open, onOpenRack }: { state: GameState; open: boolean; onOpenRack: (seat: number) => void }) {
   const p = state.phase;
   return (
     <section class="opponents" aria-label="Other players">
@@ -540,7 +620,11 @@ function Opponents({ state, open }: { state: GameState; open: boolean }) {
                 ))
               )}
             </div>
-            {open && <OpenRack tiles={sortTileIds(pl.hand)} />}
+            {open && (
+              <button class="open-rack-btn" onClick={() => onOpenRack(seat)} aria-label={`See ${windOf(state, seat)}'s tiles larger`}>
+                <OpenRack tiles={sortTileIds(pl.hand)} />
+              </button>
+            )}
           </div>
         );
       })}
@@ -603,11 +687,13 @@ function Messages({ state, session, blind }: { state: GameState; session: Sessio
   const recent = session.log.slice(-6);
   const prompt = promptFor(state, HUMAN, blind, session.lastDrawn);
   const notice = session.currentNotice;
+  const map = seatMap(state, HUMAN);
   return (
     <section class="messages" aria-live="polite">
+      <SeatMap map={map} />
       {newest && (
-        <div class="newest" title="The newest discard">
-          <TileSvg tile={newest.tile} cls="t-newest" />
+        <div class="newest" title="The newest discard" key={newest.tile}>
+          <TileSvg tile={newest.tile} cls="t-newest pop" />
         </div>
       )}
       <div class="msg-lines">
@@ -617,7 +703,9 @@ function Messages({ state, session, blind }: { state: GameState; session: Sessio
           </p>
         ))}
         {notice && <p class={`notice notice-${notice.tone}`}>{notice.text}</p>}
-        <p class="prompt">{prompt}</p>
+        <p class="prompt">
+          <Words text={prompt} />
+        </p>
       </div>
     </section>
   );
@@ -654,6 +742,8 @@ function Rack(props: {
   dead: boolean;
   /** Tiles your pinned hand uses (marked on the rack), or null. */
   fits: Set<TileId> | null;
+  /** Tiles Pip is pointing at. */
+  marks: Set<TileId>;
   onTap: (t: TileId) => void;
   onOrder: (o: Prefs['rackOrder']) => void;
   /** Open the card (cheat sheet) from right beside your tiles. */
@@ -690,14 +780,16 @@ function Rack(props: {
             const k = kindOfTile(t);
             const start = gi > 0 && ti === 0;
             const fits = props.fits?.has(t) ?? false;
+            const pick = props.marks.has(t);
             return (
               <button
-                class={`rack-tile${start ? ' group-start' : ''}${isSel ? ' is-selected' : ''}${t === props.lastDrawn ? ' is-new' : ''}${fits ? ' fits' : ''}`}
+                class={`rack-tile${start ? ' group-start' : ''}${isSel ? ' is-selected' : ''}${t === props.lastDrawn ? ' is-new' : ''}${fits ? ' fits' : ''}${pick ? ' is-pick' : ''}${k === JOKER ? ' is-joker' : ''}`}
                 key={t}
                 aria-pressed={isSel}
-                aria-label={`${kindName(k)}${t === props.lastDrawn ? ', just drawn' : ''}${fits ? ', fits your pinned hand' : ''}`}
+                aria-label={`${kindName(k)}${t === props.lastDrawn ? ', just drawn' : ''}${fits ? ', fits your pinned hand' : ''}${pick ? ', Pip suggests this tile' : ''}`}
                 onClick={() => props.onTap(t)}
               >
+                {pick && <span class="pick-mark" aria-hidden="true" />}
                 <TileSvg tile={t} cls="t-rack" />
                 {props.names && <span class="tile-name">{shortName(k)}</span>}
               </button>
@@ -709,9 +801,10 @@ function Rack(props: {
   );
 }
 
-export function ChoiceButton({ c, primary, onAct }: { c: Choice; primary?: boolean; onAct: (c: Choice) => void }) {
+export function ChoiceButton({ c, primary, glow, onAct }: { c: Choice; primary?: boolean; glow?: string | null; onAct: (c: Choice) => void }) {
+  const lit = c.ok && glow === c.key;
   return (
-    <button class={`btn${primary && c.ok ? ' primary' : ''}${c.ok ? '' : ' is-dim'}`} title={c.ok ? undefined : (c.reason ?? undefined)} onClick={() => onAct(c)}>
+    <button class={`btn${primary && c.ok ? ' primary' : ''}${c.ok ? '' : ' is-dim'}${lit ? ' is-suggested' : ''}`} title={c.ok ? undefined : (c.reason ?? undefined)} onClick={() => onAct(c)}>
       {c.tiles && c.tiles.length > 0 && (
         <span class="btn-tiles">
           {c.tiles.map((t) => (
@@ -739,8 +832,10 @@ function Actions(props: {
   onAct: (c: Choice) => void;
   onOpen: (s: SheetName) => void;
   w: (s: number) => string;
+  /** The button Pip suggests (match 1), by key. */
+  glow: string | null;
 }) {
-  const { state, session, pending, selected, blind, tc, onAct } = props;
+  const { state, session, pending, selected, blind, tc, onAct, glow } = props;
   const p = state.phase;
   const me = state.players[HUMAN] as Player;
   if (p.name === 'ended') {
@@ -782,8 +877,8 @@ function Actions(props: {
               ))}
             </div>
           )}
-          <ChoiceButton c={charlestonPassChoice(state, HUMAN, selected, blind)} primary onAct={onAct} />
-          {heavenly?.ok && <ChoiceButton c={heavenly} primary onAct={onAct} />}
+          <ChoiceButton c={charlestonPassChoice(state, HUMAN, selected, blind)} primary glow={glow} onAct={onAct} />
+          {heavenly?.ok && <ChoiceButton c={heavenly} primary glow={glow} onAct={onAct} />}
         </Fragment>
       );
     }
@@ -791,7 +886,7 @@ function Actions(props: {
       return (
         <Fragment>
           {voteChoices(state, HUMAN).map((c, i) => (
-            <ChoiceButton c={c} primary={i === 0} onAct={onAct} key={c.key} />
+            <ChoiceButton c={c} primary={i === 0} glow={glow} onAct={onAct} key={c.key} />
           ))}
         </Fragment>
       );
@@ -800,23 +895,23 @@ function Actions(props: {
         <div class="seg offer" role="group" aria-label="Courtesy pass offer">
           <span class="seg-label">Trade with {windOf(state, 2)}</span>
           {courtesyOfferChoices(state, HUMAN).map((c) => (
-            <button class="seg-btn" key={c.key} onClick={() => onAct(c)}>
+            <button class={`seg-btn${glow === c.key ? ' is-suggested' : ''}`} key={c.key} onClick={() => onAct(c)}>
               {c.label}
             </button>
           ))}
         </div>
       );
     case 'courtesyPass':
-      return pending ? <ChoiceButton c={courtesyPassChoice(state, HUMAN, selected)} primary onAct={onAct} /> : <p class="status">Waiting for the courtesy pass.</p>;
+      return pending ? <ChoiceButton c={courtesyPassChoice(state, HUMAN, selected)} primary glow={glow} onAct={onAct} /> : <p class="status">Waiting for the courtesy pass.</p>;
     case 'turn': {
       if (p.seat !== HUMAN || !tc) return <p class="status">{props.w(p.seat)} is playing…</p>;
       const ex = tc.exchanges;
       return (
         <Fragment>
-          <ChoiceButton c={tc.discard} primary onAct={onAct} />
-          <ChoiceButton c={tc.mahjong} onAct={onAct} />
+          <ChoiceButton c={tc.discard} primary glow={glow} onAct={onAct} />
+          <ChoiceButton c={tc.mahjong} glow={glow} onAct={onAct} />
           <button
-            class={`btn${ex.length ? '' : ' is-dim'}`}
+            class={`btn btn-exchange${ex.length ? '' : ' is-dim'}${glow?.startsWith('exchange-') ? ' is-suggested' : ''}`}
             onClick={() =>
               ex.length
                 ? props.onOpen('exchange')
@@ -834,7 +929,7 @@ function Actions(props: {
       return (
         <Fragment>
           {choices.map((c) => (
-            <ChoiceButton c={c} primary={c.key === 'mahjong'} onAct={onAct} key={c.key} />
+            <ChoiceButton c={c} primary={c.key === 'mahjong'} glow={glow} onAct={onAct} key={c.key} />
           ))}
         </Fragment>
       );

@@ -1,5 +1,6 @@
 /**
- * Browser check of the built page (dist/mahjong-local.html, served from a local web server): plays whole
+ * Browser check of the built page (dist/mahjong-local.html, served from a local web server): as a brand-new
+ * player it lands on the start screen and takes Pip's tour of the table, then plays whole
  * games by tapping the screen like a person would, at Mac and iPhone sizes (including iPhone screens with
  * the browser's toolbars showing, and Claude's side panel on a Mac), and saves screenshots along the way. After the free-play games it plays
  * the three guided matches in a row (pinning a hand, dismissing rule cards, asking for hints, one undo in
@@ -79,11 +80,11 @@ async function noOverflow(page, where) {
 
 /** Tap n rack tiles that are not jokers (after putting back any already chosen). */
 async function pickTiles(page, n, r) {
-  for (const t of await page.$$('.rack-tile[aria-pressed="true"]')) await t.click();
+  for (const t of await page.$$('.rack-tile[aria-pressed="true"]')) await t.click({ timeout: 3000 }).catch(() => {});
   const tiles = await page.$$('.rack-tile:not([aria-label^="Joker"])');
   const chosen = new Set();
   while (chosen.size < Math.min(n, tiles.length)) chosen.add(Math.floor(r() * tiles.length));
-  for (const i of chosen) await tiles[i].click();
+  for (const i of chosen) await tiles[i].click({ timeout: 3000 }).catch(() => {});
 }
 
 /** After a move, wait until the table shows it (the step counter changes), so the next look is fresh. */
@@ -118,8 +119,15 @@ async function openMenu(page) {
   await page.waitForSelector('.menu');
 }
 
-/** The coach's own controls: the direction picker, rule cards, pinning a suggested hand, hints and undo. */
+/** The coach's own controls: rule spotlights, the direction picker, pinning a suggested hand, words, hints and undo. */
 async function coachSteps(page, tag, r, shots, flags) {
+  // a spotlight covers the table until it's dismissed (the first time each rule comes up)
+  const spot = page.locator('.spotlight .btn.primary');
+  if (await spot.count()) {
+    await shot(page, `${tag}-spotlight`, shots);
+    await tap(spot.first());
+    return true;
+  }
   const dir = page.locator('.sheet[aria-label="Which hand are you going for?"]');
   if (await dir.count()) {
     await shot(page, `${tag}-direction`, shots);
@@ -127,16 +135,30 @@ async function coachSteps(page, tag, r, shots, flags) {
     return true;
   }
   if (await page.locator('.backdrop').count()) return false; // another sheet is open (the results, for one)
-  const got = page.locator('.coach .btn', { hasText: 'Got it' });
-  if ((await got.count()) && r() < 0.85) {
-    await shot(page, `${tag}-rule-card`, shots);
-    await got.first().click({ timeout: 3000 }).catch(() => {}); // the results sheet can open over it as the game ends
+  // tap an underlined word once per game: its meaning opens, then close it
+  const word = page.locator('.bubble button.term, .prompt button.term');
+  if (!flags.word && (await word.count())) {
+    flags.word = true;
+    await tap(word.first());
+    await page.waitForSelector('.term-card', { timeout: 2000 }).catch(() => {});
+    await shot(page, `${tag}-word`, shots);
+    await tap(page.locator('.term-card .btn'));
     return true;
   }
-  const pins = page.locator('.coach-pins .btn');
+  // match 1's open table: see one player's tiles larger, once
+  const open = page.locator('.open-rack-btn');
+  if (!flags.openRack && (await open.count())) {
+    flags.openRack = true;
+    await tap(open.first());
+    await page.waitForSelector('.open-rack-big', { timeout: 2000 }).catch(() => {});
+    await shot(page, `${tag}-open-rack`, shots);
+    await tap(page.locator('.sheet-head .btn'));
+    return true;
+  }
+  const pins = page.locator('.coach-pins .btn.chip');
   if (await pins.count()) {
     await shot(page, `${tag}-coach-pins`, shots);
-    await pins.first().click({ timeout: 3000 }).catch(() => {});
+    await tap(pins.first());
     await page.waitForSelector('.pinned', { timeout: 2000 }).catch(() => {});
     await shot(page, `${tag}-pinned`, shots);
     return true;
@@ -159,7 +181,7 @@ async function coachSteps(page, tag, r, shots, flags) {
 
 async function playOneGame(page, size, r, shots, gameIndex) {
   const tag = `${size.name}`;
-  const flags = { undone: false };
+  const flags = { undone: false, word: false, openRack: false };
   for (let step = 0; step < 1500; step++) {
     if (await page.locator('.end').count()) {
       await shot(page, `${tag}-results`, shots);
@@ -310,6 +332,17 @@ async function main() {
     await page.goto(pageUrl);
     await page.waitForSelector('.rack-tile');
     const shots = new Set();
+    // a brand-new player lands on the start screen, then takes Pip's tour of the table
+    await page.waitForSelector('.sheet .menu .welcome', { timeout: 5000 });
+    await shot(page, `${size.name}-welcome`, shots);
+    await noOverflow(page, `${size.name} welcome`);
+    await page.locator('.menu .btn', { hasText: 'Tour of the table' }).click();
+    for (let i = 0; i < 20 && (await page.locator('.spotlight').count()); i++) {
+      if (i < 3 || !(await page.locator('.spotlight .btn', { hasText: 'Skip the tour' }).count())) await shot(page, `${size.name}-tour-${i + 1}`, shots);
+      await page.locator('.spotlight .btn.primary').click();
+      await page.waitForTimeout(80);
+    }
+    if (await page.locator('.spotlight').count()) throw new Error(`${size.name}: the tour did not finish`);
     await shot(page, `${size.name}-start`, shots);
     await noOverflow(page, `${size.name} start`);
     const r = rand(1234 + size.viewport.width);
@@ -329,7 +362,8 @@ async function main() {
     if (GUIDED) {
       await openMenu(page);
       await shot(page, `${size.name}-menu`, shots);
-      await page.locator('.menu .choice-list .btn').first().click();
+      if (!/Done · take it again/.test(await page.locator('.menu').innerText())) throw new Error(`${size.name}: the tour was not ticked off`);
+      await page.locator('.menu [data-match="1"]').click();
       await page.waitForSelector('.app[data-mode="match-1"] .rack-tile');
       for (const m of [1, 2, 3]) {
         const tag = { ...size, name: `${size.name}-match${m}` };

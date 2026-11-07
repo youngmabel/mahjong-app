@@ -11,6 +11,8 @@ import type { GameState } from '../../engine/state';
 import type { TileId, Kind } from '../../engine/tiles';
 import { seatView } from '../../engine/view';
 import { lineInfo, rankLines, readRack, type LineInfo } from '../../coach';
+import { COACH_NAME, TOUR_KEY } from '../coachview';
+import { LineTiles, PatternTiles, PipSvg, Words, lineGroups } from './Pip';
 import type { ReadinessReport, Review, MatchNumber, CheckResult } from '../../coach';
 import { MATCH_LABELS, HUMAN, type Session, type Mode } from '../session';
 import { matchUnlocked, type Progress } from '../progress';
@@ -97,123 +99,46 @@ export function PinnedStrip(props: { session: Session; index: number; onSwitch: 
   );
 }
 
-// --- The coach bar --------------------------------------------------------------------------------------
-
-export function CoachBar(props: {
-  session: Session;
-  selected: TileId[];
-  onPin: (id: string) => void;
-}) {
-  const { session, selected } = props;
-  if (!session.coachOn) return <section class="coach is-empty" />;
-  const rule = session.ruleCard();
-  const settings = session.settings;
-  const pending = session.state.phase.name !== 'ended' && session.note() !== null;
-  const undo = session.canUndo ? (
-    <button class="btn small" onClick={() => session.undo()}>
-      Undo
-    </button>
-  ) : null;
-  const ruleBox = rule ? (
-    <div class="rule-row">
-      <p class="rule-card">
-        <b>Rule: {rule.title}.</b> {rule.text}
-      </p>
-      <button class="btn small primary" onClick={() => session.dismissRule(rule.key)}>
-        Got it
-      </button>
-    </div>
-  ) : null;
-  const note = session.note();
-  const p = session.state.phase;
-  // match 1, before you've pinned anything: the coach's closest hands, to pin one or two
-  const suggestPins = settings.coach === 'proactive' && session.pins.length === 0 && p.name !== 'ended';
-  const closest = suggestPins ? rankLines(readRack(seatView(session.state, HUMAN)), session.coachOptions()).filter((l) => !l.blocked).slice(0, 3) : [];
-  if (settings.coach === 'proactive') {
-    const fb = session.feedback(selected);
-    const pre = p.name === 'charleston' ? (settings.preselect[p.pass] ?? 0) : 0;
-    const lead = pre === 3 ? 'The coach chose these 3 tiles for you: tap Pass, or swap any of them. ' : pre === 2 ? 'The coach chose 2 tiles; pick the third yourself. ' : '';
-    return (
-      <section class="coach" aria-live="polite">
-        {ruleBox}
-        {closest.length > 0 && (
-          <div class="coach-pins">
-            <span class="coach-label">Your closest hands (tap one or two to pin):</span>
-            {closest.map((l) => (
-              <button class="btn small" key={l.handId} onClick={() => props.onPin(l.handId)}>
-                {l.title} · {l.away} away
-              </button>
-            ))}
-          </div>
-        )}
-        {pending && note && (
-          <p class="coach-note">
-            <b>Coach:</b> {lead}
-            {note.text} {note.why}
-            {note.extra && <span class="coach-extra"> {note.extra}</span>}
-          </p>
-        )}
-        {fb && <p class="coach-feedback">{fb}</p>}
-        {undo && <div class="coach-tools">{undo}</div>}
-      </section>
-    );
-  }
-  // matches 2 and 3, and free play with hints on: tiered hints on request
-  const shown = session.hintsShown;
-  const left = session.hintsLeft;
-  return (
-    <section class="coach" aria-live="polite">
-      {ruleBox}
-      {shown.map((t, i) => (
-        <p class="coach-note" key={i}>
-          <b>Hint {i + 1}:</b> {t}
-        </p>
-      ))}
-      {pending && (
-        <div class="coach-tools">
-          <button class="btn small" onClick={() => session.hint(selected.length > 0)} disabled={left === 0 && shown.length < 4}>
-            {shown.length === 0 ? 'Hint' : shown.length < 4 ? 'More help' : 'Hint shown'}
-            {left !== null && <span class="muted"> · {left} left</span>}
-          </button>
-          {undo}
-        </div>
-      )}
-    </section>
-  );
-}
-
 // --- Choosing a direction ---------------------------------------------------------------------------------
 
-/** Pick the hand you're going for: card lines in card order; match 1 also shows how far each is. */
+/**
+ * Pick the hand you're going for, each line drawn as tiles. Match 1 shows your own tiles (lit) and what is
+ * still needed (faded), closest first; matches 2 and 3 show the lines as the card draws them, in card order,
+ * so the picker gives nothing away.
+ */
 export function DirectionPanel(props: { session: Session; showCounts: boolean; onPin: (id: string) => void; onSkip: () => void }) {
   const { session } = props;
-  const rack = readRack(seatView(session.state, HUMAN));
-  const card = getCard(session.state.cardId);
+  const state = session.state;
+  const card = getCard(state.cardId);
   const hide = session.prefs.hideConcealed;
-  const ranked = props.showCounts ? new Map(rankLines(rack, { hideConcealed: hide }).map((l) => [l.handId, l])) : null;
+  const ranked = props.showCounts ? rankLines(readRack(seatView(state, HUMAN)), { hideConcealed: hide }) : null;
+  const hands = ranked ? ranked.map((l) => card.hands[l.handIndex] as (typeof card.hands)[number]) : card.hands.filter((x) => !(hide && x.concealed));
   return (
     <div class="choices">
       <p class="help">
-        Play has begun. Which hand on the card are you going for? Pin one (or two); the coach checks it as part of your
-        readiness report, and it stays drawn above your rack.
+        <Words text="Play has begun. Which hand on the card are you going for? Pin one (or two): it stays drawn above your rack, with the tiles you hold lit up." />
       </p>
       <ul class="choice-list">
-        {card.hands.map((hand) =>
-          hide && hand.concealed ? null : (
+        {hands.map((hand) => {
+          const info = ranked?.find((l) => l.handId === hand.id) ?? null;
+          return (
             <li key={hand.id}>
-              <button class="btn wide" onClick={() => props.onPin(hand.id)}>
+              <button class="btn wide hand-choice" onClick={() => props.onPin(hand.id)}>
                 <span class="btn-text">
-                  {hand.section} #{hand.line}
+                  <span>
+                    {hand.section} #{hand.line}
+                    {info && <span class="muted"> · {info.blocked ? "can't be finished" : `${info.away} to go`}</span>}
+                  </span>
                   <small>
                     {hand.concealed ? 'Concealed · ' : ''}
-                    {hand.value} points{ranked?.get(hand.id) ? ` · ${(ranked.get(hand.id) as LineInfo).away} away` : ''}
-                    {hand.note ? ` · ${hand.note}` : ''}
+                    {hand.value} points{hand.note ? ` · ${hand.note}` : ''}
                   </small>
                 </span>
+                {info ? <LineTiles groups={lineGroups(state, hand.id).groups} cls="t-choice" /> : <PatternTiles handId={hand.id} cardId={state.cardId} />}
               </button>
             </li>
-          ),
-        )}
+          );
+        })}
       </ul>
       <div class="end-actions">
         <button class="btn" onClick={props.onSkip}>
@@ -234,8 +159,17 @@ export interface MenuInfo {
   freeGameNumber: number | null;
 }
 
-export function MenuPanel(props: { info: MenuInfo; onMatch: (m: MatchNumber) => void; onFree: () => void; onOpen: (s: 'log' | 'settings') => void }) {
+/** The start screen and Menu: a path in three steps (learn, practice, play), with what you've done ticked off. */
+export function MenuPanel(props: {
+  info: MenuInfo;
+  welcome?: boolean;
+  onTour: () => void;
+  onMatch: (m: MatchNumber) => void;
+  onFree: () => void;
+  onOpen: (s: 'log' | 'settings') => void;
+}) {
   const { progress, mode, guidedInProgress, freeGameNumber } = props.info;
+  const toured = progress.seenRules.includes(TOUR_KEY);
   const status = (m: MatchNumber): string => {
     if (!matchUnlocked(progress, m)) return `Opens after match ${m - 1}`;
     if (guidedInProgress === m) return mode.kind === 'guided' && mode.match === m ? 'Playing now' : 'Resume';
@@ -244,15 +178,47 @@ export function MenuPanel(props: { info: MenuInfo; onMatch: (m: MatchNumber) => 
   };
   return (
     <div class="menu">
-      <h3>Guided practice</h3>
+      {props.welcome && (
+        <div class="welcome">
+          <PipSvg pose="point" />
+          <p>
+            Hi, I&rsquo;m {COACH_NAME}! I&rsquo;ll teach you American mah jongg step by step. Start with the tour; you can come back
+            here any time from the Menu.
+          </p>
+        </div>
+      )}
+      <h3>
+        <span class="step-no">1</span> Learn the basics
+      </h3>
+      <ul class="choice-list">
+        <li>
+          <button class={`btn wide${toured ? '' : ' primary'}`} onClick={props.onTour}>
+            <span class="btn-text">
+              Tour of the table
+              <small>{toured ? 'Done · take it again' : 'Two minutes: what everything on the screen is for'}</small>
+            </span>
+          </button>
+        </li>
+        <li>
+          <button class="btn wide is-dim" disabled>
+            <span class="btn-text">
+              Lessons
+              <small>Coming in the next update: five short rounds, from naming the tiles to declaring Mah Jongg</small>
+            </span>
+          </button>
+        </li>
+      </ul>
+      <h3>
+        <span class="step-no">2</span> Practice with {COACH_NAME}
+      </h3>
       <p class="help">
-        Three practice games with help that fades: an open table, a concealed table, then a dress rehearsal. Wins aren't
+        Three practice games with help that fades: an open table, a concealed table, then a dress rehearsal. Wins aren&rsquo;t
         needed; you graduate after match 3, or early if every check passes after match 2.
       </p>
       <ul class="choice-list">
         {([1, 2, 3] as const).map((m) => (
           <li key={m}>
-            <button class={`btn wide${matchUnlocked(progress, m) ? '' : ' is-dim'}`} onClick={() => props.onMatch(m)}>
+            <button class={`btn wide${matchUnlocked(progress, m) ? '' : ' is-dim'}`} data-match={m} onClick={() => props.onMatch(m)}>
               <span class="btn-text">
                 {MATCH_LABELS[m]}
                 <small>
@@ -265,10 +231,12 @@ export function MenuPanel(props: { info: MenuInfo; onMatch: (m: MatchNumber) => 
         ))}
       </ul>
       <p class="help">{progress.graduated ? 'You have graduated: Classic tiles are unlocked, and every match stays open to replay.' : 'Not graduated yet.'}</p>
-      <h3>Free play</h3>
+      <h3>
+        <span class="step-no">3</span> Play on your own
+      </h3>
       <ul class="choice-list">
         <li>
-          <button class="btn wide" onClick={props.onFree}>
+          <button class="btn wide" data-free="1" onClick={props.onFree}>
             <span class="btn-text">
               Free play
               <small>{mode.kind === 'free' ? 'Playing now' : freeGameNumber ? `Resume game ${freeGameNumber}` : 'Start'} · only the cheat sheet, unless you turn on coach hints in Settings</small>
@@ -290,10 +258,10 @@ export function MenuPanel(props: { info: MenuInfo; onMatch: (m: MatchNumber) => 
 
 // --- After a guided match --------------------------------------------------------------------------------
 
-function CheckRow({ name, c }: { name: string; c: CheckResult }) {
-  const mark = c.pass === true ? 'Passed' : c.pass === false ? 'Not yet' : 'Not counted';
+function CheckRow({ name, c, advice }: { name: string; c: CheckResult; advice?: boolean }) {
+  const mark = advice ? 'Advice' : c.pass === true ? 'Passed' : c.pass === false ? 'Not yet' : 'Not counted';
   return (
-    <li class={`check ${c.pass === true ? 'is-pass' : c.pass === false ? 'is-fail' : 'is-skip'}`}>
+    <li class={`check ${advice ? 'is-skip' : c.pass === true ? 'is-pass' : c.pass === false ? 'is-fail' : 'is-skip'}`}>
       <span class="check-mark">{mark}</span>
       <span>
         <b>{name}.</b> {c.text}
@@ -311,7 +279,7 @@ export function MatchReport(props: { report: ReadinessReport; review: Review }) 
         <CheckRow name="Rules" c={report.rules} />
         <CheckRow name="Choosing a hand" c={report.hand} />
         <CheckRow name="Card reading" c={report.card} />
-        <CheckRow name="Pace (advice only)" c={report.pace} />
+        <CheckRow name="Pace" c={report.pace} advice />
       </ul>
       <h3>Coach's review</h3>
       <p class="help">
