@@ -112,6 +112,7 @@ async function coachSteps(page, tag, r, shots, flags) {
     await dir.locator('.choice-list .btn').first().click();
     return true;
   }
+  if (await page.locator('.backdrop').count()) return false; // another sheet is open (the results, for one)
   const got = page.locator('.coach .btn', { hasText: 'Got it' });
   if ((await got.count()) && r() < 0.85) {
     await shot(page, `${tag}-rule-card`, shots);
@@ -346,7 +347,7 @@ async function main() {
     await page.locator('#hide-concealed').uncheck();
     await page.locator('.sheet-head .btn').click();
     await openMenu(page);
-    await page.locator('.menu .btn', { hasText: 'Settings' }).click();
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await shot(page, `${size.name}-settings`, shots);
     await page.locator('.sheet-head .btn').click();
     // a reload resumes the same game

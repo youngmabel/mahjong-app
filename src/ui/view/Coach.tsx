@@ -21,7 +21,10 @@ type Player = GameState['players'][number];
 // --- The pinned hand -----------------------------------------------------------------------------------
 
 export interface PinnedDisplay {
-  line: LineInfo;
+  /** The pinned line's closest version, or null when it no longer fits your exposures. */
+  line: LineInfo | null;
+  title: string;
+  handId: string;
   /** Groups in card order: tiles you hold (or have exposed), plus how many are still missing. */
   groups: { kind: Kind; tiles: TileId[]; missing: number; exposed: boolean }[];
   /** Your hidden tiles this version of the line uses. */
@@ -34,14 +37,19 @@ export function pinnedDisplay(session: Session, index: number): PinnedDisplay | 
   const state = session.state;
   const rack = readRack(seatView(state, HUMAN));
   const hi = rack.card.hands.findIndex((x) => x.id === id);
-  const line = hi >= 0 ? lineInfo(rack, hi) : null;
-  if (!line) return null;
+  if (hi < 0) return null;
+  const hand = rack.card.hands[hi] as { section: string; line: number };
+  const title = `${hand.section} #${hand.line}`;
+  const line = lineInfo(rack, hi);
+  if (!line) return { line: null, title, handId: id, groups: [], fits: new Set() };
   const me = state.players[HUMAN] as Player;
   const placed = arrangeTiles(line.target as Target, me.hand, me.exposures);
   const fits = new Set<TileId>();
   for (const p of placed) if (!p.exposed) for (const t of p.tiles) fits.add(t);
   return {
     line,
+    title,
+    handId: id,
     groups: placed.map((p) => ({ kind: p.group.kind, tiles: p.tiles, missing: Math.max(0, p.group.size - p.tiles.length), exposed: p.exposed })),
     fits,
   };
@@ -51,14 +59,14 @@ export function PinnedStrip(props: { session: Session; index: number; onSwitch: 
   const d = pinnedDisplay(props.session, props.index);
   if (!d) return null;
   const count = props.session.pins.length;
-  const away = d.line.away;
+  const away = d.line?.away ?? 0;
   return (
-    <div class="pinned" aria-label={`Your pinned hand: ${d.line.title}`}>
+    <div class="pinned" aria-label={`Your pinned hand: ${d.title}`}>
       <div class="pinned-head">
         <span class="pinned-title">
-          Going for <b>{d.line.title}</b>
-          <span class="muted"> · {away === 0 ? 'complete' : `${away} away`}</span>
-          {d.line.blocked && <span class="pill pill-dead">Can't be finished</span>}
+          Going for <b>{d.title}</b>
+          {d.line ? <span class="muted"> · {away === 0 ? 'complete' : `${away} away`}</span> : <span class="muted"> · it doesn't fit your exposures any more, so unpin it</span>}
+          {d.line?.blocked && <span class="pill pill-dead">Can't be finished</span>}
         </span>
         <span class="pinned-tools">
           {count > 1 && (
@@ -66,7 +74,7 @@ export function PinnedStrip(props: { session: Session; index: number; onSwitch: 
               Other hand
             </button>
           )}
-          <button class="btn small" onClick={() => props.onUnpin(d.line.handId)} aria-label={`Unpin ${d.line.title}`}>
+          <button class="btn small" onClick={() => props.onUnpin(d.handId)} aria-label={`Unpin ${d.title}`}>
             Unpin
           </button>
         </span>

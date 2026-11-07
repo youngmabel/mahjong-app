@@ -128,7 +128,7 @@ export function coachNote(view: SeatView, opts: CoachOptions, ctx: NoteContext =
       const d = suggestDiscard(view, opts);
       if (!d) return null;
       const nudge =
-        opts.pinned.length > 0
+        pinnedLines(rack, opts).length > 0
           ? "Keep the tiles your pinned hand uses, and let go of one it doesn't."
           : "Look for a tile none of your likely hands uses. Pairs are hard to replace, so they're usually worth keeping.";
       return note('turn', d.text, d.why, nudge, d.warning, [d.tile], 'discard');
