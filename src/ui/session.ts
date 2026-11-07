@@ -226,6 +226,18 @@ function lowerFirst(s: string): string {
   return s.charAt(0).toLowerCase() + s.slice(1);
 }
 
+/** Live feedback ("uses that 3 Crak") reworded for the review after the game ("used that 3 Crak"). */
+function pastTense(text: string | null): string | null {
+  if (!text) return null;
+  return text
+    .replace(' uses that ', ' used that ')
+    .replace(' is half of a pair. Pairs are hard to get', ' was half of a pair. Pairs are hard to get')
+    .replace(/^Careful: /, 'It was risky: ')
+    .replace(' has 2 exposures', ' had 2 exposures')
+    .replace(/ has (\d) exposures and may be/, ' had $1 exposures and may have been')
+    .replace(' still use ', ' still used ');
+}
+
 function coachPick(note: CoachNote): string {
   return note.text.startsWith('Suggestion: ') ? `Coach's pick: ${lowerFirst(note.text.slice(12))}` : `Coach's pick: ${lowerFirst(note.text)}`;
 }
@@ -878,7 +890,7 @@ export class Session {
         const what = kinds.length > 0 ? tileList(kinds) : 'nothing from your rack';
         const did = action.type === 'courtesyPass' ? `In the courtesy pass you gave ${what}.` : `You passed ${what}${blind ? ` and ${blind} blind` : ''}.`;
         const followed = sameKinds(action.tiles, note.tiles) && blind === note.blind;
-        return { ...base, did, loss: followed ? 0 : passLoss(view, opts, action.tiles), note: followed ? null : choiceFeedback(view, opts, action.tiles), followed };
+        return { ...base, did, loss: followed ? 0 : passLoss(view, opts, action.tiles), note: followed ? null : pastTense(choiceFeedback(view, opts, action.tiles)), followed };
       }
       case 'discard': {
         const k = kindOfTile(action.tile);
@@ -890,7 +902,7 @@ export class Session {
         if (followed) return { ...base, did, loss: 0, note: null, followed };
         const pinned = pinnedNeeding(view, opts, k)[0];
         const warn = feedingWarning(view, getCard(this.state.cardId), k);
-        const lesson = pinned ? `Your pinned hand, ${pinned.title}, used it.` : warn ? warn.replace(/^Careful: /, 'It was risky: ') : null;
+        const lesson = pinned ? `Your pinned hand, ${pinned.title}, used it.` : pastTense(warn);
         return { ...base, did, loss: discardLoss(view, opts, k), note: lesson, followed };
       }
       case 'claimMahjong':

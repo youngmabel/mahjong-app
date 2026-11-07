@@ -7,8 +7,9 @@ import { h, render } from 'preact';
 import { loadCard } from '../engine/card';
 import { PRACTICE_CARD_TEXT } from '../engine/cards/practice';
 import { readPrefs } from './prefs';
+import { readProgress } from './progress';
 import type { SavedGame } from './session';
-import { openStore, type Store } from './storage';
+import { NO_STORE, openStore, type Store } from './storage';
 import { App } from './view/App';
 
 interface HotHook {
@@ -36,24 +37,31 @@ function onSaveError(): void {
 async function start(data: unknown): Promise<void> {
   const root = document.getElementById('app');
   if (!root) return;
-  const carried = (data && typeof data === 'object' ? data : {}) as { game?: SavedGame | null; prefs?: unknown };
+  const carried = (data && typeof data === 'object' ? data : {}) as { game?: SavedGame | null; guided?: SavedGame | null; prefs?: unknown; progress?: unknown };
   let store: Store;
   try {
     store = await openStore(onSaveError);
   } catch {
-    store = { kind: 'none', loadGame: async () => null, saveGame: () => {}, loadPrefs: async () => null, savePrefs: () => {} };
+    store = NO_STORE;
   }
   // the viewer may hand back a frozen copy of the game kept across a page update: work on a fresh one
-  let saved: SavedGame | null = carried.game ? (JSON.parse(JSON.stringify(carried.game)) as SavedGame) : null;
-  let prefsRaw: unknown = carried.prefs ? JSON.parse(JSON.stringify(carried.prefs)) : null;
+  const fresh = <T,>(v: T | null | undefined): T | null => (v ? (JSON.parse(JSON.stringify(v)) as T) : null);
+  let saved = fresh(carried.game);
+  let guided = fresh(carried.guided);
+  let prefsRaw: unknown = fresh(carried.prefs);
+  let progressRaw: unknown = fresh(carried.progress);
   if (!saved) saved = await store.loadGame().catch(() => null);
+  if (!guided) guided = await store.loadGuided().catch(() => null);
   if (!prefsRaw) prefsRaw = await store.loadPrefs().catch(() => null);
+  if (!progressRaw) progressRaw = await store.loadProgress().catch(() => null);
   root.textContent = '';
   render(
     <App
       store={store}
       prefs={readPrefs(prefsRaw)}
+      progress={readProgress(progressRaw)}
       saved={saved}
+      guided={guided}
       registerSnapshot={(fn) => {
         snapshotFn = fn;
       }}

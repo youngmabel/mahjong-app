@@ -18,10 +18,12 @@ export interface Progress {
   graduated: boolean;
   /** Rule slips by referee code, across all matches (skill tracking, docs/05-teaching-plan.md section 7). */
   slips: Record<string, number>;
+  /** The last finished match recorded (its game's id), so a reload never counts it twice. */
+  lastRecorded: string;
 }
 
 export function emptyProgress(): Progress {
-  return { v: 1, seenRules: [], completed: [], reports: {}, graduated: false, slips: {} };
+  return { v: 1, seenRules: [], completed: [], reports: {}, graduated: false, slips: {}, lastRecorded: '' };
 }
 
 const MATCHES: readonly MatchNumber[] = [1, 2, 3];
@@ -34,6 +36,7 @@ export function readProgress(raw: unknown): Progress {
   if (Array.isArray(r.seenRules)) p.seenRules = r.seenRules.filter((x): x is string => typeof x === 'string');
   if (Array.isArray(r.completed)) p.completed = MATCHES.filter((m) => (r.completed as unknown[]).includes(m));
   if (typeof r.graduated === 'boolean') p.graduated = r.graduated;
+  if (typeof r.lastRecorded === 'string') p.lastRecorded = r.lastRecorded;
   if (r.reports && typeof r.reports === 'object') {
     const reps = r.reports as Record<string, unknown>;
     for (const m of MATCHES) {
@@ -64,9 +67,10 @@ export interface MatchOutcome {
   mayGraduateEarly: boolean;
 }
 
-/** Record a finished match. Graduation is automatic after match 3. */
-export function recordMatch(p: Progress, report: ReadinessReport, slips: readonly { code: string }[]): MatchOutcome {
-  const next: Progress = { ...p, completed: [...p.completed], reports: { ...p.reports }, slips: { ...p.slips }, seenRules: [...p.seenRules] };
+/** Record a finished match once (by its game id). Graduation is automatic after match 3. */
+export function recordMatch(p: Progress, report: ReadinessReport, slips: readonly { code: string }[], gameId = ''): MatchOutcome {
+  if (gameId && p.lastRecorded === gameId) return { progress: p, graduatedNow: false, mayGraduateEarly: !p.graduated && report.match === 2 && report.allPass };
+  const next: Progress = { ...p, completed: [...p.completed], reports: { ...p.reports }, slips: { ...p.slips }, seenRules: [...p.seenRules], lastRecorded: gameId };
   if (!next.completed.includes(report.match)) next.completed.push(report.match);
   next.completed.sort();
   next.reports[report.match] = report;

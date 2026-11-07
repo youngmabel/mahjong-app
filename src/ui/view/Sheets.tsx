@@ -46,9 +46,23 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
 
 // --- Cheat sheet ------------------------------------------------------------------------------------------
 
-export function CheatSheetPanel({ card, prefs, onPrefs }: { card: Card; prefs: Prefs; onPrefs: (p: Prefs) => void }) {
-  const sections = cheatSheet(card, prefs.hideConcealed);
-  const hidden = prefs.hideConcealed ? card.hands.filter((h) => h.concealed).length : 0;
+export interface Pinning {
+  pins: string[];
+  onToggle: (handId: string) => void;
+  /** Tiles away for each line (guided match 1 only), else undefined. */
+  away?: Map<string, number>;
+}
+
+export function CheatSheetPanel({ card, prefs, onPrefs, pinning }: { card: Card; prefs: Prefs; onPrefs: (p: Prefs) => void; pinning?: Pinning }) {
+  const [closest, setClosest] = useState(false);
+  let sections = cheatSheet(card, prefs.hideConcealed);
+  if (closest && pinning?.away) {
+    const away = pinning.away;
+    const all = sections.flatMap((s) => s.lines).filter((l) => away.has(l.id));
+    all.sort((a, b) => (away.get(a.id) as number) - (away.get(b.id) as number));
+    sections = [{ name: 'Closest to your hand', lines: all }];
+  }
+  const hidden = prefs.hideConcealed ? card.hands.filter((x) => x.concealed).length : 0;
   return (
     <div class="cheat">
       <div class="cheat-tools">
@@ -66,6 +80,16 @@ export function CheatSheetPanel({ card, prefs, onPrefs }: { card: Card; prefs: P
             {hidden} concealed hand{hidden === 1 ? '' : 's'} hidden
           </span>
         )}
+        {pinning?.away && (
+          <div class="seg" role="group" aria-label="Order of the lines">
+            <button class="seg-btn" aria-pressed={!closest} onClick={() => setClosest(false)}>
+              Card order
+            </button>
+            <button class="seg-btn" aria-pressed={closest} onClick={() => setClosest(true)}>
+              Closest to my hand
+            </button>
+          </div>
+        )}
       </div>
       <p class="legend">
         Each line is drawn as tiles. Letters in shapes mark suits: tiles with the same letter share one suit, and different
@@ -81,6 +105,12 @@ export function CheatSheetPanel({ card, prefs, onPrefs }: { card: Card; prefs: P
                 <span class="cl-title">{l.title}</span>
                 <span class={`tag ${l.concealed ? 'tag-c' : 'tag-x'}`}>{l.concealed ? 'Concealed' : 'Open'}</span>
                 <span class="cl-value">{l.value} points</span>
+                {pinning?.away?.has(l.id) && <span class="tag">{pinning.away.get(l.id)} away</span>}
+                {pinning && (
+                  <button class={`btn small${pinning.pins.includes(l.id) ? ' primary' : ''}`} aria-pressed={pinning.pins.includes(l.id)} onClick={() => pinning.onToggle(l.id)}>
+                    {pinning.pins.includes(l.id) ? 'Pinned' : 'Pin'}
+                  </button>
+                )}
               </header>
               {l.layouts.map((lay, i) => (
                 <div class="cl-pattern" key={i}>
@@ -147,6 +177,10 @@ export function SettingsPanel(props: {
   onPrefs: (p: Prefs) => void;
   storeKind: 'claude' | 'browser' | 'none';
   seed: string;
+  /** The guided match being played, or null in free play. */
+  guided: 1 | 2 | 3 | null;
+  /** Safety for this game (a guided match sets it). */
+  safetyNow: boolean;
   onNewSession: () => void;
 }) {
   const { prefs, onPrefs } = props;
@@ -164,12 +198,35 @@ export function SettingsPanel(props: {
         : "Saving isn't available here, so a reload starts a new game.";
   return (
     <div class="settings">
+      {props.guided ? (
+        <div class="setting">
+          <span class="setting-label">Safety: {props.safetyNow ? 'on' : 'off'}</span>
+          <p class="help">
+            Set by match {props.guided}: on in matches 1 and 2, off in match 3 (as at a real table). Your free-play setting is {prefs.safety ? 'on' : 'off'}.
+          </p>
+        </div>
+      ) : (
+        <Toggle
+          id="safety"
+          label="Safety"
+          checked={prefs.safety}
+          onChange={(v) => onPrefs({ ...prefs, safety: v })}
+          help="On: a legal move that would make your own hand dead is blocked, with the reason. Off: you can make it, as at a real table, and your hand goes dead. Illegal moves are always blocked."
+        />
+      )}
       <Toggle
-        id="safety"
-        label="Safety"
-        checked={prefs.safety}
-        onChange={(v) => onPrefs({ ...prefs, safety: v })}
-        help="On: a legal move that would make your own hand dead is blocked, with the reason. Off: you can make it, as at a real table, and your hand goes dead. Illegal moves are always blocked."
+        id="coach-free"
+        label="Coach hints in free play"
+        checked={prefs.coachInFreePlay}
+        onChange={(v) => onPrefs({ ...prefs, coachInFreePlay: v })}
+        help="Adds the Hint button, rule reminders and pinning a hand to free play. The guided matches always have the coach."
+      />
+      <Toggle
+        id="open-racks"
+        label="Show the other players' tiles in match 1"
+        checked={prefs.openRacks}
+        onChange={(v) => onPrefs({ ...prefs, openRacks: v })}
+        help="Match 1 is an open table, so everyone's tiles can be face up. Turn this off for more room on a small screen."
       />
       <Toggle
         id="stop-every"
@@ -200,7 +257,7 @@ export function SettingsPanel(props: {
         label="Hide concealed hands on the cheat sheet"
         checked={prefs.hideConcealed}
         onChange={(v) => onPrefs({ ...prefs, hideConcealed: v })}
-        help="The other players still play every hand, and you can still declare a concealed hand you complete."
+        help="Also keeps concealed hands out of the coach's suggestions. The other players still play every hand, and you can still declare a concealed hand you complete."
       />
       <div class="setting">
         <span class="setting-label">Tile style</span>
@@ -233,10 +290,10 @@ export function SettingsPanel(props: {
         <span class="setting-label">Session</span>
         {confirming ? (
           <div class="confirm">
-            <p class="help">Start over with every score at zero? The current game ends.</p>
+            <p class="help">{props.guided ? `Restart match ${props.guided} with a new deal? This game ends.` : 'Start over with every score at zero? The current game ends.'}</p>
             <div class="row">
               <button class="btn danger" onClick={props.onNewSession}>
-                Start over
+                {props.guided ? 'Restart' : 'Start over'}
               </button>
               <button class="btn" onClick={() => setConfirming(false)}>
                 Keep playing
@@ -245,12 +302,18 @@ export function SettingsPanel(props: {
           </div>
         ) : (
           <button class="btn" onClick={() => setConfirming(true)}>
-            New session
+            {props.guided ? 'Restart this match' : 'New session'}
           </button>
         )}
       </div>
       <p class="fineprint">
-        Practice card (invented hands) · level 2 computer players · game seed {props.seed}
+        Practice card (invented hands) ·{' '}
+        {props.guided === 1
+          ? 'gentle computer players (level 1) who never declare Mah Jongg'
+          : props.guided === 3
+            ? 'level 2 and level 3 computer players'
+            : 'level 2 computer players'}{' '}
+        · game seed {props.seed}
       </p>
     </div>
   );
@@ -296,7 +359,7 @@ function Rackline({ state, seat }: { state: GameState; seat: number }) {
   );
 }
 
-export function EndPanel({ state, onNext, onClose }: { state: GameState; onNext: () => void; onClose: () => void }) {
+export function EndPanel({ state, onNext, onClose, guided }: { state: GameState; onNext: () => void; onClose: () => void; guided?: ComponentChildren }) {
   const p = state.phase;
   if (p.name !== 'ended') return null;
   const r = p.result;
@@ -324,6 +387,7 @@ export function EndPanel({ state, onNext, onClose }: { state: GameState; onNext:
           ))}
         </div>
       )}
+      {guided}
       <table class="scores">
         <thead>
           <tr>
@@ -352,9 +416,11 @@ export function EndPanel({ state, onNext, onClose }: { state: GameState; onNext:
         </div>
       ))}
       <div class="end-actions">
-        <button class="btn primary" onClick={onNext}>
-          Next game
-        </button>
+        {!guided && (
+          <button class="btn primary" onClick={onNext}>
+            Next game
+          </button>
+        )}
         <button class="btn" onClick={onClose}>
           Look at the table
         </button>

@@ -372,3 +372,14 @@ describe('the Clean tile set', () => {
     }
   });
 });
+
+describe('screen code', () => {
+  it("never names a variable h, which would hide the screen library's h() inside JSX", async () => {
+    const { readdirSync, readFileSync } = await import('node:fs');
+    const dir = 'src/ui/view';
+    for (const f of readdirSync(dir).filter((x) => x.endsWith('.tsx'))) {
+      const text = readFileSync(`${dir}/${f}`, 'utf8');
+      expect(text, f).not.toMatch(/\(\s*h\s*[,)][^\n]*=>|\b(?:const|let|var)\s+h\b/);
+    }
+  });
+});

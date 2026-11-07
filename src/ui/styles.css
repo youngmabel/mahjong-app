@@ -166,8 +166,8 @@ button {
   min-height: 100%;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: 'top' 'opps' 'disc' 'msg' 'mine' 'rack' 'actions';
-  grid-template-rows: auto auto minmax(min-content, 1fr) auto auto auto auto;
+  grid-template-areas: 'top' 'opps' 'disc' 'msg' 'coach' 'mine' 'rack' 'actions';
+  grid-template-rows: auto auto minmax(min-content, 1fr) auto auto auto auto auto;
   gap: 6px;
   padding-block: 6px;
 }
@@ -182,6 +182,9 @@ button {
 }
 .messages {
   grid-area: msg;
+}
+.coach {
+  grid-area: coach;
 }
 .mine {
   grid-area: mine;
@@ -1146,8 +1149,8 @@ button {
 @media (min-aspect-ratio: 5/4) and (min-width: 620px) {
   .app {
     grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas: 'top top' 'opps disc' 'msg disc' 'mine mine' 'rack rack' 'actions actions';
-    grid-template-rows: auto auto minmax(min-content, 1fr) auto auto auto;
+    grid-template-areas: 'top top' 'opps disc' 'msg disc' 'coach disc' 'mine mine' 'rack rack' 'actions actions';
+    grid-template-rows: auto auto minmax(min-content, 1fr) auto auto auto auto;
     column-gap: 14px;
   }
   .messages {
@@ -1248,5 +1251,249 @@ button {
 @media (prefers-reduced-motion: reduce) {
   .rack-tile {
     transition: none;
+  }
+}
+
+/* --- The coach (milestone 3) ------------------------------------------------------------------------ */
+.coach {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--felt-2);
+  border: 1px solid var(--felt-line);
+  min-width: 0;
+}
+.coach.is-empty {
+  display: none;
+}
+.coach p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  text-wrap: pretty;
+}
+.coach b {
+  font-weight: 600;
+}
+.rule-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.rule-card {
+  flex: 1 1 auto;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--referee-bg);
+  color: var(--referee-ink);
+}
+.coach-note {
+  color: var(--on-felt);
+}
+.coach-extra {
+  color: var(--on-felt-2);
+}
+.coach-feedback {
+  color: var(--brass-2);
+}
+.coach-tools,
+.coach-pins {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.coach-label {
+  font-size: 12px;
+  color: var(--on-felt-2);
+}
+.line.tone-coach {
+  color: var(--brass-2);
+}
+.sheet .line.tone-coach {
+  color: var(--ink-2);
+  font-style: italic;
+}
+
+/* The pinned hand, drawn just above the rack */
+.t-pin {
+  width: 22px;
+}
+.pinned {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 2px 2px 4px;
+  border-bottom: 1px dashed var(--felt-line);
+}
+.pinned-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 12.5px;
+}
+.pinned-tools {
+  display: flex;
+  gap: 4px;
+}
+.pinned-tools .btn.small {
+  min-height: 30px;
+  padding: 2px 8px;
+  font-size: 12px;
+}
+.pinned-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.pinned-tiles .exp-group.is-exposed {
+  padding: 1px;
+  border-radius: 4px;
+  background: #ffffff1f;
+}
+.ghost {
+  display: inline-flex;
+  opacity: 0.38;
+  outline: 1.5px dashed var(--on-felt-2);
+  outline-offset: -1px;
+  border-radius: 4px;
+}
+.rack-tile.fits:after {
+  content: '';
+  position: absolute;
+  left: 15%;
+  right: 15%;
+  bottom: -4px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--brass);
+}
+.with-names .rack-tile.fits:after {
+  bottom: -3px;
+}
+
+/* Match 1's open table: each opponent's hidden tiles, face up */
+.opp-open {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px;
+  padding-bottom: 2px;
+}
+
+/* Menu, reports */
+.menu h3,
+.guided-end h3 {
+  margin: 16px 0 6px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.menu h3:first-child {
+  margin-top: 0;
+}
+.checks,
+.review {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+.check {
+  display: grid;
+  grid-template-columns: 7.5em minmax(0, 1fr);
+  gap: 8px;
+  align-items: baseline;
+}
+.check-mark {
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  font-size: 12px;
+  text-align: center;
+  white-space: nowrap;
+}
+.check.is-pass .check-mark {
+  background: var(--ink);
+  color: var(--sheet);
+  border-color: var(--ink);
+}
+.check.is-fail .check-mark {
+  border-style: dashed;
+}
+.review li {
+  padding-left: 12px;
+  border-left: 3px solid var(--line);
+}
+.grad {
+  margin: 12px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--sheet-2);
+  font-weight: 500;
+}
+@media (max-aspect-ratio: 5/4), (max-width: 619px) {
+  .coach {
+    padding: 4px 8px;
+    gap: 3px;
+  }
+  .coach p {
+    font-size: 12.5px;
+  }
+  .t-pin {
+    width: 18px;
+  }
+}
+
+/* Wide screens: the open racks share each opponent's row, and the pinned hand sits on one line. */
+@media (min-aspect-ratio: 5/4) and (min-width: 620px) {
+  .opp:has(.opp-open) {
+    grid-template-columns: 7.5em auto minmax(0, 1fr) auto;
+  }
+  .opp-open {
+    grid-column: 4;
+    grid-row: 1;
+    padding-bottom: 0;
+  }
+  .pinned {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .pinned-head {
+    order: 2;
+    flex: 0 1 auto;
+  }
+  .pinned-tiles {
+    order: 1;
+    flex: 1 1 auto;
+  }
+}
+@media (max-aspect-ratio: 5/4), (max-width: 619px) {
+  .t-pin {
+    width: 16px;
+  }
+  .pinned {
+    gap: 2px;
+    padding-bottom: 3px;
+  }
+  .pinned-head {
+    font-size: 12px;
+  }
+  .pinned-tiles {
+    gap: 3px;
+  }
+  .opp-open .tile {
+    width: 16px;
   }
 }

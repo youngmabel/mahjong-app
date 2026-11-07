@@ -1,14 +1,17 @@
 /**
- * The table screen: your rack, everyone's exposures, the discard chart, the message line, and a button
- * for every move the referee allows right now. All game logic lives in session.ts and moves.ts.
+ * The table screen: your rack, everyone's exposures, the discard chart, the message line, the coach, and
+ * a button for every move the referee allows right now. All game logic lives in session.ts and moves.ts.
+ * Free play and the guided match each have their own game; the Menu switches between them.
  */
 
-import { Fragment, h } from 'preact';
+import { Fragment, h, type ComponentChildren } from 'preact';
 import { useEffect, useReducer, useRef, useState } from 'preact/hooks';
 import { getCard } from '../../engine/card';
 import { windOf } from '../../engine/engine';
 import type { GameState } from '../../engine/state';
-import { kindName, kindOfTile, type TileId } from '../../engine/tiles';
+import { kindName, kindOfTile, sortTileIds, type TileId } from '../../engine/tiles';
+import { seatView } from '../../engine/view';
+import { rankLines, readRack, type MatchNumber } from '../../coach';
 import { describeCell, discardChart, rackGroups } from '../layout';
 import {
   callChoices,
@@ -26,22 +29,28 @@ import {
   type Choice,
 } from '../moves';
 import type { Prefs } from '../prefs';
-import { HUMAN, Session, type SavedGame } from '../session';
+import { graduate, matchUnlocked, recordMatch, type MatchOutcome, type Progress } from '../progress';
+import { FREE_PLAY, HUMAN, MATCH_LABELS, Session, sameMode, type Mode, type SavedGame, type SessionHost } from '../session';
 import type { Store } from '../storage';
 import { cleanSprite } from '../tiles/clean';
+import { CoachBar, DirectionPanel, MatchReport, MenuPanel, OpenRack, PinnedStrip, pinnedDisplay } from './Coach';
 import { ChoicesPanel, CheatSheetPanel, EndPanel, LogPanel, SettingsPanel, Sheet } from './Sheets';
 import { BackSvg, TileSvg, shortName } from './Tile';
 
 const SPRITE = cleanSprite();
 
-type SheetName = null | 'card' | 'settings' | 'log' | 'end' | 'exchange' | 'amend';
+type SheetName = null | 'card' | 'settings' | 'log' | 'end' | 'exchange' | 'amend' | 'menu' | 'direction';
 type Player = GameState['players'][number];
 
 export interface AppProps {
   store: Store;
   prefs: Prefs;
+  progress: Progress;
+  /** Your free-play game, if saved. */
   saved: SavedGame | null;
-  /** Lets the viewer keep your game when the page is updated while open. */
+  /** Your guided match in progress, if saved. */
+  guided: SavedGame | null;
+  /** Lets the viewer keep your games when the page is updated while open. */
   registerSnapshot: (fn: () => unknown) => void;
   /** Called with a message when saving fails. */
   onSaveProblem: (fn: (message: string) => void) => void;
@@ -53,52 +62,110 @@ function article(name: string): string {
 
 const POSITION_LABEL: Record<string, string> = { right: 'on your right', across: 'across', left: 'on your left' };
 
+function inProgress(g: SavedGame | null): MatchNumber | null {
+  return g && g.mode?.kind === 'guided' && g.state.phase.name !== 'ended' ? g.mode.match : null;
+}
+
 export function App(props: AppProps) {
   const [, force] = useReducer((n: number) => n + 1, 0);
   const [prefs, setPrefs] = useState(props.prefs);
+  const [progress, setProgress] = useState(props.progress);
   const [sheet, setSheet] = useState<SheetName>(null);
   const [sel, setSel] = useState<{ key: string; tiles: TileId[]; blind: number }>({ key: '', tiles: [], blind: 0 });
   const [endShownFor, setEndShownFor] = useState('');
-  const sessionRef = useRef<Session | null>(null);
-  if (!sessionRef.current) {
-    sessionRef.current = new Session(
-      {
-        schedule: (fn, ms) => {
-          const t = window.setTimeout(fn, ms);
-          return () => window.clearTimeout(t);
-        },
-        changed: () => force(0),
-        save: (g) => props.store.saveGame(g),
-      },
-      props.prefs,
-      props.saved,
-    );
+  const [pinView, setPinView] = useState(0);
+  const [outcome, setOutcome] = useState<{ key: string; o: MatchOutcome } | null>(null);
+  const prefsRef = useRef(props.prefs);
+  const progressRef = useRef(props.progress);
+  const saves = useRef<{ free: SavedGame | null; guided: SavedGame | null }>({ free: props.saved, guided: props.guided });
+  const sessions = useRef<{ free: Session | null; guided: Session | null }>({ free: null, guided: null });
+  const [mode, setMode] = useState<Mode>(() => (props.prefs.lastMode === 'guided' && inProgress(props.guided) !== null ? (props.guided?.mode as Mode) : FREE_PLAY));
+
+  function saveProgress(p: Progress) {
+    progressRef.current = p;
+    setProgress(p);
+    props.store.saveProgress(p);
+    sessions.current.free?.setProgress(p);
+    sessions.current.guided?.setProgress(p);
   }
-  const session = sessionRef.current;
+
+  const host: SessionHost = {
+    schedule: (fn, ms) => {
+      const t = window.setTimeout(fn, ms);
+      return () => window.clearTimeout(t);
+    },
+    changed: () => force(0),
+    save: (g) => {
+      if (g.mode?.kind === 'guided') {
+        saves.current.guided = g;
+        props.store.saveGuided(g);
+      } else {
+        saves.current.free = g;
+        props.store.saveGame(g);
+      }
+    },
+    saveProgress,
+    now: () => Date.now(),
+  };
+
+  function sessionFor(m: Mode): Session {
+    const slot = m.kind === 'guided' ? 'guided' : 'free';
+    let s = sessions.current[slot];
+    if (!s || !sameMode(s.mode, m)) {
+      s?.stop();
+      s = new Session(host, prefsRef.current, slot === 'guided' ? saves.current.guided : saves.current.free, { mode: m, progress: progressRef.current });
+      sessions.current[slot] = s;
+    }
+    return s;
+  }
+  const session = sessionFor(mode);
 
   useEffect(() => {
-    props.registerSnapshot(() => ({ game: session.serialize(), prefs: session.prefs }));
-    props.onSaveProblem((m) => session.explain(m, 'info'));
-    session.advance();
-    return () => session.stop();
+    props.registerSnapshot(() => ({
+      game: sessions.current.free?.serialize() ?? saves.current.free,
+      guided: sessions.current.guided?.serialize() ?? saves.current.guided,
+      prefs: prefsRef.current,
+      progress: progressRef.current,
+    }));
+    props.onSaveProblem((m) => (sessions.current.guided ?? sessions.current.free)?.explain(m, 'info'));
   }, []);
+
+  useEffect(() => {
+    session.setPrefs(prefsRef.current); // also lets the computer players move
+    // a pointer to what's new, until you start your first guided match
+    if (session.mode.kind === 'free' && progressRef.current.completed.length === 0 && !saves.current.guided && !sessions.current.guided)
+      session.explain('New: guided practice with a coach. Open the Menu to start match 1, the open table.', 'info');
+    return () => session.stop();
+  }, [session]);
 
   const state = session.state;
   const p = state.phase;
   const me = state.players[HUMAN] as Player;
   const ended = p.name === 'ended';
   const endKey = `${session.sessionId}:${state.gameNumber}`;
+  const result = session.matchResult();
 
   useEffect(() => {
     if (ended && endShownFor !== endKey) {
       setEndShownFor(endKey);
       setSheet('end');
     }
+    if (ended && result && outcome?.key !== endKey) {
+      const o = recordMatch(progressRef.current, result.report, result.stats.slips, session.sessionId);
+      if (o.progress !== progressRef.current) saveProgress(o.progress);
+      if (o.graduatedNow) unlockClassic();
+      setOutcome({ key: endKey, o });
+    }
   }, [ended, endKey]);
 
-  // Selections belong to one decision: any accepted move starts a fresh one.
+  useEffect(() => {
+    if (session.needsDirection && sheet === null) setSheet('direction');
+  });
+
+  // Selections belong to one decision: any accepted move starts a fresh one (match 1 starts with the coach's picks).
   const decisionKey = `${endKey}:${state.actionCount}`;
-  const cur = sel.key === decisionKey ? sel : { key: decisionKey, tiles: [] as TileId[], blind: 0 };
+  const pre = sel.key === decisionKey ? null : session.preselect();
+  const cur = sel.key === decisionKey ? sel : { key: decisionKey, tiles: pre?.tiles ?? ([] as TileId[]), blind: pre?.blind ?? 0 };
   const selected = cur.tiles.filter((t) => me.hand.includes(t));
   const blind = cur.blind;
   const pending = isPending(state, HUMAN);
@@ -106,9 +173,54 @@ export function App(props: AppProps) {
   const w = (s: number) => (s === HUMAN ? 'You' : windOf(state, s));
 
   function updatePrefs(next: Prefs) {
+    prefsRef.current = next;
     setPrefs(next);
     session.setPrefs(next);
     props.store.savePrefs(next);
+  }
+
+  function unlockClassic() {
+    const next = { ...prefsRef.current, progress: { ...prefsRef.current.progress, graduated: true } };
+    updatePrefs(next);
+  }
+
+  function switchTo(m: Mode, fresh = false) {
+    session.stop();
+    if (fresh) {
+      const slot = m.kind === 'guided' ? 'guided' : 'free';
+      sessions.current[slot]?.stop();
+      sessions.current[slot] = null;
+      if (slot === 'guided') saves.current.guided = null;
+    }
+    const next = { ...prefsRef.current, lastMode: m.kind };
+    prefsRef.current = next;
+    setPrefs(next);
+    props.store.savePrefs(next);
+    setSel({ key: '', tiles: [], blind: 0 });
+    setPinView(0);
+    setSheet(null);
+    setMode(m);
+  }
+
+  function guidedInProgress(): MatchNumber | null {
+    const g = sessions.current.guided;
+    if (g && g.mode.kind === 'guided') return g.state.phase.name !== 'ended' ? g.mode.match : null;
+    return inProgress(saves.current.guided);
+  }
+
+  function pickMatch(m: MatchNumber) {
+    if (!matchUnlocked(progressRef.current, m)) {
+      setSheet(null);
+      session.explain(`Match ${m} opens after you finish match ${m - 1}.`, 'info');
+      return;
+    }
+    switchTo({ kind: 'guided', match: m }, guidedInProgress() !== m);
+  }
+
+  function doGraduate() {
+    saveProgress(graduate(progressRef.current));
+    unlockClassic();
+    if (outcome) setOutcome({ ...outcome, o: { ...outcome.o, graduatedNow: true, mayGraduateEarly: false } });
   }
 
   function tapTile(t: TileId) {
@@ -141,7 +253,8 @@ export function App(props: AppProps) {
 
   function act(c: Choice) {
     if (!c.ok) {
-      session.explain(c.reason ?? "That move isn't allowed right now.");
+      if (c.screenOnly) session.explain(c.reason ?? "That move isn't allowed right now.");
+      else session.refused(c.reason ?? "That move isn't allowed right now.", c.code);
       return;
     }
     if (session.act(c.action) === null) {
@@ -150,16 +263,32 @@ export function App(props: AppProps) {
     }
   }
 
+  function pin(id: string) {
+    if (session.pins.includes(id)) {
+      session.unpin(id);
+      setPinView(0);
+      return;
+    }
+    if (!session.pin(id)) session.explain('You can pin up to two hands. Unpin one first.', 'info');
+    else setPinView(session.pins.indexOf(id));
+  }
+
   const tc = turnChoices(state, HUMAN, selected);
   const card = getCard(state.cardId);
+  const settings = session.settings;
+  const shownPin = session.coachOn ? pinnedDisplay(session, Math.min(pinView, Math.max(0, session.pins.length - 1))) : null;
+  const openRacks = settings.openRacks && prefs.openRacks;
+  const away = settings.coach === 'proactive' ? new Map(rankLines(readRack(seatView(state, HUMAN)), { hideConcealed: prefs.hideConcealed }).map((l) => [l.handId, l.away])) : undefined;
+  const match = session.match;
 
   return (
-    <div class={`app${prefs.tileNames ? ' with-names' : ''}`} data-phase={p.name} data-waiting-for-you={pending ? 'yes' : 'no'} data-step={`${state.gameNumber}:${state.actionCount}`}>
+    <div class={`app${prefs.tileNames ? ' with-names' : ''}`} data-phase={p.name} data-mode={match ? `match-${match}` : 'free'} data-waiting-for-you={pending ? 'yes' : 'no'} data-step={`${state.gameNumber}:${state.actionCount}`}>
       <svg class="sprite" aria-hidden="true" dangerouslySetInnerHTML={{ __html: SPRITE }} />
-      <TopBar state={state} onOpen={setSheet} />
-      <Opponents state={state} />
+      <TopBar state={state} label={match ? `Match ${match}` : null} onOpen={setSheet} />
+      <Opponents state={state} open={openRacks} />
       <Discards state={state} session={session} />
       <Messages state={state} session={session} blind={blind} />
+      <CoachBar session={session} selected={selected} onPin={pin} />
       <MyExposures me={me} canChange={(tc?.amends.length ?? 0) > 0} onChange={() => setSheet('amend')} />
       <Rack
         hand={me.hand}
@@ -168,9 +297,12 @@ export function App(props: AppProps) {
         lastDrawn={session.lastDrawn}
         names={prefs.tileNames}
         dead={me.dead !== null}
+        fits={shownPin?.fits ?? null}
         onTap={tapTile}
         onOrder={(o) => updatePrefs({ ...prefs, rackOrder: o })}
-      />
+      >
+        {shownPin && <PinnedStrip session={session} index={Math.min(pinView, session.pins.length - 1)} onSwitch={() => setPinView((pinView + 1) % session.pins.length)} onUnpin={pin} />}
+      </Rack>
       <section class="actions" aria-label="Your moves">
         <Actions
           state={state}
@@ -187,7 +319,39 @@ export function App(props: AppProps) {
       </section>
       {sheet === 'card' && (
         <Sheet title={card.name} onClose={() => setSheet(null)}>
-          <CheatSheetPanel card={card} prefs={prefs} onPrefs={updatePrefs} />
+          <CheatSheetPanel card={card} prefs={prefs} onPrefs={updatePrefs} pinning={session.coachOn ? { pins: session.pins, onToggle: pin, away } : undefined} />
+        </Sheet>
+      )}
+      {sheet === 'menu' && (
+        <Sheet title="Menu" onClose={() => setSheet(null)}>
+          <MenuPanel
+            info={{ progress, mode, guidedInProgress: guidedInProgress(), freeGameNumber: (sessions.current.free?.state ?? saves.current.free?.state)?.gameNumber ?? null }}
+            onMatch={pickMatch}
+            onFree={() => switchTo(FREE_PLAY)}
+            onOpen={(s) => setSheet(s)}
+          />
+        </Sheet>
+      )}
+      {sheet === 'direction' && (
+        <Sheet
+          title="Which hand are you going for?"
+          onClose={() => {
+            session.dismissDirection();
+            setSheet(null);
+          }}
+        >
+          <DirectionPanel
+            session={session}
+            showCounts={settings.coach === 'proactive'}
+            onPin={(id) => {
+              pin(id);
+              setSheet(null);
+            }}
+            onSkip={() => {
+              session.dismissDirection();
+              setSheet(null);
+            }}
+          />
         </Sheet>
       )}
       {sheet === 'settings' && (
@@ -197,8 +361,11 @@ export function App(props: AppProps) {
             onPrefs={updatePrefs}
             storeKind={props.store.kind}
             seed={state.seed}
+            guided={match}
+            safetyNow={session.safety}
             onNewSession={() => {
               session.newSession();
+              setSel({ key: '', tiles: [], blind: 0 });
               setSheet(null);
             }}
           />
@@ -210,7 +377,7 @@ export function App(props: AppProps) {
         </Sheet>
       )}
       {sheet === 'end' && ended && (
-        <Sheet title={`Game ${state.gameNumber} results`} onClose={() => setSheet(null)}>
+        <Sheet title={match ? `${MATCH_LABELS[match]}: results` : `Game ${state.gameNumber} results`} onClose={() => setSheet(null)}>
           <EndPanel
             state={state}
             onNext={() => {
@@ -218,6 +385,20 @@ export function App(props: AppProps) {
               session.nextGame();
             }}
             onClose={() => setSheet(null)}
+            guided={
+              match && result ? (
+                <GuidedEnd
+                  match={match}
+                  result={result}
+                  outcome={outcome?.key === endKey ? outcome.o : null}
+                  onNextMatch={(m) => pickMatch(m)}
+                  onAgain={() => switchTo({ kind: 'guided', match }, true)}
+                  onFree={() => switchTo(FREE_PLAY)}
+                  onGraduate={doGraduate}
+                  graduated={progress.graduated}
+                />
+              ) : undefined
+            }
           />
         </Sheet>
       )}
@@ -243,13 +424,54 @@ export function App(props: AppProps) {
   );
 }
 
-function TopBar({ state, onOpen }: { state: GameState; onOpen: (s: SheetName) => void }) {
+function GuidedEnd(props: {
+  match: MatchNumber;
+  result: NonNullable<ReturnType<Session['matchResult']>>;
+  outcome: MatchOutcome | null;
+  graduated: boolean;
+  onNextMatch: (m: MatchNumber) => void;
+  onAgain: () => void;
+  onFree: () => void;
+  onGraduate: () => void;
+}) {
+  const { match, result, outcome } = props;
+  return (
+    <div class="guided-end">
+      <MatchReport report={result.report} review={result.review} />
+      {outcome?.graduatedNow ? (
+        <p class="grad">You graduated! Classic tiles are unlocked (their art arrives with the tile-art step), and free play is all yours. Every match stays open to replay.</p>
+      ) : outcome?.mayGraduateEarly ? (
+        <p class="grad">Every check passed, so you can graduate now, or play match 3 first.</p>
+      ) : null}
+      <div class="end-actions">
+        {outcome?.mayGraduateEarly && (
+          <button class="btn primary" onClick={props.onGraduate}>
+            Graduate now
+          </button>
+        )}
+        {match < 3 && !outcome?.graduatedNow && (
+          <button class={`btn${outcome?.mayGraduateEarly ? '' : ' primary'}`} onClick={() => props.onNextMatch((match + 1) as MatchNumber)}>
+            Next: match {match + 1}
+          </button>
+        )}
+        <button class="btn" onClick={props.onAgain}>
+          Play match {match} again
+        </button>
+        <button class={`btn${outcome?.graduatedNow ? ' primary' : ''}`} onClick={props.onFree}>
+          Free play
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function TopBar({ state, label, onOpen }: { state: GameState; label: string | null; onOpen: (s: SheetName) => void }) {
   const dealer = state.dealer === HUMAN;
   return (
     <header class="topbar">
       <div class="tb-who">
         <span class="tb-game">
-          Game {state.gameNumber}
+          {label ?? `Game ${state.gameNumber}`}
           {dealer && <span class="tb-dealer"> · Dealer</span>}
         </span>
         <span class="tb-seat">
@@ -268,18 +490,15 @@ function TopBar({ state, onOpen }: { state: GameState; onOpen: (s: SheetName) =>
         <button class="btn small" onClick={() => onOpen('card')}>
           Card
         </button>
-        <button class="btn small" onClick={() => onOpen('log')}>
-          Log
-        </button>
-        <button class="btn small" onClick={() => onOpen('settings')}>
-          Settings
+        <button class="btn small" onClick={() => onOpen('menu')}>
+          Menu
         </button>
       </nav>
     </header>
   );
 }
 
-function Opponents({ state }: { state: GameState }) {
+function Opponents({ state, open }: { state: GameState; open: boolean }) {
   const p = state.phase;
   return (
     <section class="opponents" aria-label="Other players">
@@ -317,6 +536,7 @@ function Opponents({ state }: { state: GameState }) {
                 ))
               )}
             </div>
+            {open && <OpenRack tiles={sortTileIds(pl.hand)} />}
           </div>
         );
       })}
@@ -428,8 +648,11 @@ function Rack(props: {
   lastDrawn: TileId | null;
   names: boolean;
   dead: boolean;
+  /** Tiles your pinned hand uses (marked on the rack), or null. */
+  fits: Set<TileId> | null;
   onTap: (t: TileId) => void;
   onOrder: (o: Prefs['rackOrder']) => void;
+  children?: ComponentChildren;
 }) {
   const groups = rackGroups(props.hand, props.order);
   return (
@@ -447,18 +670,20 @@ function Rack(props: {
           </button>
         </div>
       </div>
+      {props.children}
       <div class={`rack${props.dead ? ' is-dead' : ''}`}>
         {groups.map((g, gi) =>
           g.tiles.map((t, ti) => {
             const isSel = props.selected.includes(t);
             const k = kindOfTile(t);
             const start = gi > 0 && ti === 0;
+            const fits = props.fits?.has(t) ?? false;
             return (
               <button
-                class={`rack-tile${start ? ' group-start' : ''}${isSel ? ' is-selected' : ''}${t === props.lastDrawn ? ' is-new' : ''}`}
+                class={`rack-tile${start ? ' group-start' : ''}${isSel ? ' is-selected' : ''}${t === props.lastDrawn ? ' is-new' : ''}${fits ? ' fits' : ''}`}
                 key={t}
                 aria-pressed={isSel}
-                aria-label={`${kindName(k)}${t === props.lastDrawn ? ', just drawn' : ''}`}
+                aria-label={`${kindName(k)}${t === props.lastDrawn ? ', just drawn' : ''}${fits ? ', fits your pinned hand' : ''}`}
                 onClick={() => props.onTap(t)}
               >
                 <TileSvg tile={t} cls="t-rack" />
@@ -507,7 +732,16 @@ function Actions(props: {
   const p = state.phase;
   const me = state.players[HUMAN] as Player;
   if (p.name === 'ended') {
-    return (
+    return session.match ? (
+      <Fragment>
+        <button class="btn primary" onClick={() => props.onOpen('end')}>
+          See your report
+        </button>
+        <button class="btn" onClick={() => props.onOpen('menu')}>
+          Menu
+        </button>
+      </Fragment>
+    ) : (
       <Fragment>
         <button class="btn primary" onClick={() => session.nextGame()}>
           Next game

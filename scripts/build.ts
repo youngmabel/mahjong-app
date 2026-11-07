@@ -37,7 +37,7 @@ async function main(): Promise<void> {
     entryPoints: ['src/ui/main.tsx'],
     bundle: true,
     format: 'iife',
-    minify: true,
+    minify: process.env.MINIFY !== '0', // MINIFY=0 npm run build: readable code for debugging
     write: false,
     target: ['es2020', 'safari15', 'chrome100', 'firefox100'],
     jsxFactory: 'h',

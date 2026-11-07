@@ -98,7 +98,7 @@ export function readiness(match: MatchNumber, stats: GuidedStats): ReadinessRepo
   const pace: CheckResult =
     m === null
       ? { pass: null, text: 'No Charleston decisions were timed.' }
-      : { pass: m <= 15000, text: `Your Charleston passes took about ${Math.round(m / 1000)} seconds each (15 or less is typical at a table). This is advice only.` };
+      : { pass: m <= 15000, text: `Your Charleston passes took ${m < 1500 ? 'about a second' : `about ${Math.round(m / 1000)} seconds`} each (15 or less is typical at a table). This is advice only.` };
   return { match, rules, hand, card, pace, allPass: rules.pass === true && hand.pass === true };
 }
 

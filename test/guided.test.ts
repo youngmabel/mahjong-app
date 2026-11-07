@@ -12,7 +12,7 @@ import { kindOfTile, JOKER } from '../src/engine/tiles';
 import { seatView } from '../src/engine/view';
 import { rankLines, readRack, sentenceCount, type MatchNumber } from '../src/coach';
 import { charlestonPassChoice, turnChoices } from '../src/ui/moves';
-import { DEFAULT_PREFS, type Prefs } from '../src/ui/prefs';
+import { DEFAULT_PREFS, readPrefs, type Prefs } from '../src/ui/prefs';
 import { emptyProgress, matchUnlocked, nextMatch, readProgress, recordMatch } from '../src/ui/progress';
 import { FREE_PLAY, HINT_BUDGET, HUMAN, RUN_REACH, Session, type Mode, type SavedGame } from '../src/ui/session';
 import { guidedFollowerMove } from './coachstandin';
@@ -309,5 +309,18 @@ describe('saving guided games', () => {
     const old: SavedGame = { ...saved, mode: undefined, coach: undefined };
     expect(new Session(new FakeHost(), prefs(), old).sessionId).toBe(s.sessionId);
     expect(new Session(new FakeHost(), prefs(), old, { mode: guided(1) }).sessionId).not.toBe(s.sessionId);
+  });
+});
+
+describe('settings added for the coach', () => {
+  it('reads older saved settings with the new defaults, and keeps the new ones', () => {
+    const old = readPrefs({ v: 1, safety: true, speed: 'slow', progress: { tutorialDone: false, graduated: false } });
+    expect(old.coachInFreePlay).toBe(false);
+    expect(old.openRacks).toBe(true);
+    expect(old.lastMode).toBe('free');
+    expect(old.safety).toBe(true);
+    const back = readPrefs(JSON.parse(JSON.stringify({ ...DEFAULT_PREFS, coachInFreePlay: true, openRacks: false, lastMode: 'guided' })));
+    expect([back.coachInFreePlay, back.openRacks, back.lastMode]).toEqual([true, false, 'guided']);
+    expect(readPrefs({ lastMode: 'tutorial', openRacks: 'no' }).lastMode).toBe('free');
   });
 });

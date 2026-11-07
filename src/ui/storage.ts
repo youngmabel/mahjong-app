@@ -1,22 +1,43 @@
 /**
- * Saving progress. Inside Claude, the game and settings go to the artifact's private per-person storage
- * (the `db` capability, under data/users/<your id>/, which only you can read), so they follow you between
- * your Mac and iPhone. Opened anywhere else (a local copy of the page), the browser's own storage is used.
+ * Saving progress. Inside Claude, your games, settings and progress go to the artifact's private
+ * per-person storage (the `db` capability, under data/users/<your id>/, which only you can read), so they
+ * follow you between your Mac and iPhone. Opened anywhere else (a local copy of the page), the browser's
+ * own storage is used. Free play and the guided match each keep their own saved game.
  *
  * Writes go one at a time per document; a newer save waiting behind a slow one replaces it.
  */
 
 import type { SavedGame } from './session';
 import type { Prefs } from './prefs';
+import type { Progress } from './progress';
 
 export interface Store {
   /** 'claude': per-person storage that follows you; 'browser': this browser only; 'none': nothing is saved. */
   kind: 'claude' | 'browser' | 'none';
+  /** Your free-play game. */
   loadGame(): Promise<SavedGame | null>;
   saveGame(game: SavedGame): void;
+  /** Your guided match in progress. */
+  loadGuided(): Promise<SavedGame | null>;
+  saveGuided(game: SavedGame): void;
   loadPrefs(): Promise<unknown>;
   savePrefs(prefs: Prefs): void;
+  loadProgress(): Promise<unknown>;
+  saveProgress(progress: Progress): void;
 }
+
+/** A store that saves nothing (when no storage is available at all). */
+export const NO_STORE: Store = {
+  kind: 'none',
+  loadGame: async () => null,
+  saveGame: () => {},
+  loadGuided: async () => null,
+  saveGuided: () => {},
+  loadPrefs: async () => null,
+  savePrefs: () => {},
+  loadProgress: async () => null,
+  saveProgress: () => {},
+};
 
 interface DocRef {
   get(): Promise<{ exists: boolean; data(): Record<string, unknown> | undefined }>;
@@ -69,18 +90,34 @@ function thaw<T>(v: T): T {
 
 function claudeStore(db: Db, uid: string, onError: (e: unknown) => void): Store {
   const gameRef = db.doc(`data/users/${uid}/game`);
+  const guidedRef = db.doc(`data/users/${uid}/guided`);
   const prefsRef = db.doc(`data/users/${uid}/prefs`);
+  const progressRef = db.doc(`data/users/${uid}/progress`);
   const writeGame = serialWriter((d) => gameRef.set(d), onError);
+  const writeGuided = serialWriter((d) => guidedRef.set(d), onError);
   const writePrefs = serialWriter((d) => prefsRef.set(d), onError);
+  const writeProgress = serialWriter((d) => progressRef.set(d), onError);
+  const loadSaved = async (ref: DocRef) => {
+    const snap = await ref.get();
+    const data = snap.exists ? snap.data() : undefined;
+    return data && data.game ? thaw(data.game as SavedGame) : null;
+  };
   return {
     kind: 'claude',
-    async loadGame() {
-      const snap = await gameRef.get();
-      const data = snap.exists ? snap.data() : undefined;
-      return data && data.game ? thaw(data.game as SavedGame) : null;
-    },
+    loadGame: () => loadSaved(gameRef),
     saveGame(game) {
       writeGame({ game: game as unknown as Record<string, unknown>, savedAt: Date.now() });
+    },
+    loadGuided: () => loadSaved(guidedRef),
+    saveGuided(game) {
+      writeGuided({ game: game as unknown as Record<string, unknown>, savedAt: Date.now() });
+    },
+    async loadProgress() {
+      const snap = await progressRef.get();
+      return snap.exists ? thaw(snap.data()?.progress ?? null) : null;
+    },
+    saveProgress(progress) {
+      writeProgress({ progress: progress as unknown as Record<string, unknown>, savedAt: Date.now() });
     },
     async loadPrefs() {
       const snap = await prefsRef.get();
@@ -93,7 +130,9 @@ function claudeStore(db: Db, uid: string, onError: (e: unknown) => void): Store 
 }
 
 const LOCAL_GAME = 'mahjong-practice:game';
+const LOCAL_GUIDED = 'mahjong-practice:guided';
 const LOCAL_PREFS = 'mahjong-practice:prefs';
+const LOCAL_PROGRESS = 'mahjong-practice:progress';
 
 function browserStore(): Store {
   let ok = false;
@@ -127,6 +166,18 @@ function browserStore(): Store {
     },
     saveGame(game) {
       if (ok) write(LOCAL_GAME, game);
+    },
+    async loadGuided() {
+      return (read(LOCAL_GUIDED) as SavedGame | null) ?? null;
+    },
+    saveGuided(game) {
+      if (ok) write(LOCAL_GUIDED, game);
+    },
+    async loadProgress() {
+      return read(LOCAL_PROGRESS);
+    },
+    saveProgress(progress) {
+      if (ok) write(LOCAL_PROGRESS, progress);
     },
     async loadPrefs() {
       return read(LOCAL_PREFS);

@@ -57,7 +57,7 @@ export const RULE_CARDS: Record<string, RuleCard> = {
   afterCall: {
     key: 'afterCall',
     title: 'After a call',
-    text: 'You expose the group and discard without drawing, and play continues to your right. You can change the exposure until you discard (in this app, also until you start a joker exchange).',
+    text: 'Expose the group, then discard without drawing. You can change the exposure until you discard; this app also locks it when you start a joker exchange.',
   },
   concealed: {
     key: 'concealed',

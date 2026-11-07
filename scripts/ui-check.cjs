@@ -1,11 +1,15 @@
 /**
  * Browser check of the built page (dist/mahjong-local.html, served from a local web server): plays whole
  * games by tapping the screen like a person would, at Mac and iPhone sizes (including iPhone screens with
- * the browser's toolbars showing), and saves screenshots along the way. It fails on any page error, a page
- * wider than the screen, a stuck game, a game that never ends, or a reload that doesn't resume the game.
+ * the browser's toolbars showing), and saves screenshots along the way. After the free-play games it plays
+ * the three guided matches in a row (pinning a hand, dismissing rule cards, asking for hints, one undo in
+ * match 1), checks each readiness report, and checks that you graduate after match 3. It fails on any page
+ * error, a page wider than the screen, a stuck game, a game that never ends, or a reload that doesn't
+ * resume the game and your progress.
  *
  * Needs Playwright with Chromium (installed in Claude's build environment, not part of npm install):
  *   npm run build && node scripts/ui-check.cjs [screenshot-folder] [games-per-size]
+ * GUIDED=0 skips the guided matches; SIZES=mac,iphone-portrait limits the sizes.
  */
 
 const { chromium } = require('playwright');
@@ -38,6 +42,7 @@ function serveDist() {
 }
 const OUT = path.resolve(process.argv[2] || path.join(ROOT, 'dist', 'ui-check'));
 const GAMES = Number(process.argv[3] || 1);
+const GUIDED = process.env.GUIDED !== '0';
 const PREACT = fs.readFileSync(path.join(ROOT, 'node_modules/preact/dist/preact.min.umd.js'));
 const HOOKS = fs.readFileSync(path.join(ROOT, 'node_modules/preact/hooks/dist/hooks.umd.js'));
 
@@ -94,14 +99,59 @@ async function clickButton(page, text) {
   return true;
 }
 
+async function openMenu(page) {
+  await page.locator('.tb-nav .btn', { hasText: 'Menu' }).click();
+  await page.waitForSelector('.menu');
+}
+
+/** The coach's own controls: the direction picker, rule cards, pinning a suggested hand, hints and undo. */
+async function coachSteps(page, tag, r, shots, flags) {
+  const dir = page.locator('.sheet[aria-label="Which hand are you going for?"]');
+  if (await dir.count()) {
+    await shot(page, `${tag}-direction`, shots);
+    await dir.locator('.choice-list .btn').first().click();
+    return true;
+  }
+  const got = page.locator('.coach .btn', { hasText: 'Got it' });
+  if ((await got.count()) && r() < 0.85) {
+    await shot(page, `${tag}-rule-card`, shots);
+    await got.first().click();
+    return true;
+  }
+  const pins = page.locator('.coach-pins .btn');
+  if (await pins.count()) {
+    await shot(page, `${tag}-coach-pins`, shots);
+    await pins.first().click();
+    await page.waitForSelector('.pinned', { timeout: 2000 });
+    await shot(page, `${tag}-pinned`, shots);
+    return true;
+  }
+  const hint = page.locator('.coach .btn:not([disabled])', { hasText: /^(Hint|More help)/ });
+  if ((await hint.count()) && r() < 0.12) {
+    await hint.first().click();
+    await shot(page, `${tag}-hint`, shots);
+    return true;
+  }
+  const undo = page.locator('.coach .btn', { hasText: 'Undo' });
+  if ((await undo.count()) && !flags.undone) {
+    flags.undone = true;
+    await undo.click();
+    await shot(page, `${tag}-undo`, shots);
+    return true;
+  }
+  return false;
+}
+
 async function playOneGame(page, size, r, shots, gameIndex) {
   const tag = `${size.name}`;
+  const flags = { undone: false };
   for (let step = 0; step < 1500; step++) {
     if (await page.locator('.end').count()) {
       await shot(page, `${tag}-results`, shots);
       await noOverflow(page, `${tag} results`);
       return await page.locator('.end-title').innerText();
     }
+    if (await coachSteps(page, tag, r, shots, flags)) continue;
     // read the table's state in one go (separate reads could straddle a computer player's move)
     const { before, phase, mine } = await page.evaluate(() => {
       const app = document.querySelector('.app');
@@ -260,6 +310,34 @@ async function main() {
       await page.locator('.end .btn', { hasText: 'Next game' }).click();
       await page.waitForSelector('.rack-tile');
     }
+    // the guided matches, one after another, ending in graduation
+    if (GUIDED) {
+      await openMenu(page);
+      await shot(page, `${size.name}-menu`, shots);
+      await page.locator('.menu .choice-list .btn').first().click();
+      await page.waitForSelector('.app[data-mode="match-1"] .rack-tile');
+      for (const m of [1, 2, 3]) {
+        const tag = { ...size, name: `${size.name}-match${m}` };
+        try {
+          results.push(`match ${m}: ${await playOneGame(page, tag, r, shots, m)}`);
+        } catch (e) {
+          await page.screenshot({ path: path.join(OUT, `${size.name}-match${m}-FAILED.png`) });
+          throw e;
+        }
+        if ((await page.locator('.end .checks .check').count()) !== 4) throw new Error(`${size.name} match ${m}: no readiness report`);
+        await page.locator('.end .checks').scrollIntoViewIfNeeded();
+        await shot(page, `${size.name}-match${m}-report`, shots);
+        if (m < 3) {
+          await page.locator('.end .btn', { hasText: `Next: match ${m + 1}` }).click();
+          await page.waitForSelector(`.app[data-mode="match-${m + 1}"] .rack-tile`);
+        } else {
+          const grad = await page.locator('.end .grad').innerText().catch(() => '');
+          if (!/graduated/.test(grad)) throw new Error(`${size.name}: no graduation after match 3 (${grad})`);
+          await page.locator('.end .btn', { hasText: 'Free play' }).click();
+          await page.waitForSelector('.app[data-mode="free"] .rack-tile');
+        }
+      }
+    }
     // the cheat sheet and settings
     await page.locator('.tb-nav .btn', { hasText: 'Card' }).click();
     await shot(page, `${size.name}-cheat-sheet`, shots);
@@ -267,7 +345,8 @@ async function main() {
     await shot(page, `${size.name}-cheat-sheet-hidden`, shots);
     await page.locator('#hide-concealed').uncheck();
     await page.locator('.sheet-head .btn').click();
-    await page.locator('.tb-nav .btn', { hasText: 'Settings' }).click();
+    await openMenu(page);
+    await page.locator('.menu .btn', { hasText: 'Settings' }).click();
     await shot(page, `${size.name}-settings`, shots);
     await page.locator('.sheet-head .btn').click();
     // a reload resumes the same game
@@ -286,6 +365,12 @@ async function main() {
     const after = await page.locator('.tb-game').innerText().catch(() => '');
     if (rackAfter !== rackBefore || before !== after)
       throw new Error(`${size.name}: a reload did not resume the same game (${savedBefore}).\n before: ${before} ${rackBefore}\n after:  ${after} ${rackAfter}`);
+    if (GUIDED) {
+      await openMenu(page);
+      const menu = await page.locator('.menu').innerText();
+      if (!/You have graduated/.test(menu)) throw new Error(`${size.name}: graduation was not kept after a reload`);
+      await page.locator('.sheet-head .btn').click();
+    }
     if (errors.length) throw new Error(`${size.name}: page errors: ${errors.join(' | ')}`);
     report.push({ size: size.name, results, screenshots: shots.size });
     await ctx.close();
